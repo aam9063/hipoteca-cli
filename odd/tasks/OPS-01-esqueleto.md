@@ -75,21 +75,41 @@ ejecución real en los tres sistemas es parte del criterio de aceptación.
       `README.md` incluye atribución dual, "no es asesoramiento" y "no afiliado", y
       `LICENSE` es MIT.
 - [x] OPS-01.7 Verificación local de `make check` · Criterio: verde en este Windows.
-- [ ] OPS-01.8 Verificación en CI de los tres sistemas · Criterio: los tres jobs en verde
-      en el PR.
+- [x] OPS-01.8 Verificación en CI de los tres sistemas · Criterio: los tres jobs en verde
+      en el PR. Run `40690111332`: ubuntu, macos y windows en success.
 - [ ] OPS-01.9 Review gate con informe en `odd/reviews/OPS-01.md`.
 
 ## Evidencia de verificación
 
-Se completa al cerrar.
+- `bash scripts/check.sh` en local (Windows, Go 1.26.1): **EXIT=0**. gofmt, `go mod tidy`
+  sin diff, vet, staticcheck, govulncheck (0 vulnerabilidades en código llamable) y tests.
+- CI, run `40689508544`: `check (windows-latest)` **success**; `check (ubuntu-latest)` y
+  `check (macos-latest)` **failure** con `scripts/tools.sh: Permission denied`.
+  Causa: el bit ejecutable nunca entró al índice de git porque el autor trabaja en Windows,
+  donde no existe. Corregido en `f47db0f` (modo 100755 en los cuatro scripts, invocación
+  por `bash` en `check.sh`, y `*.sh text eol=lf` en `.gitattributes` para que un shebang con
+  CRLF no rompa Unix).
+- CI, run `40690111332` (con `f47db0f`): **ubuntu, macos y windows en success**.
+- Reproducción del review gate: 7 títulos probados; detecta `OPS-01`, `FIN-04`, `CORE-01`
+  sin informe y no se activa con títulos sin ID.
+- `make build` produce `bin/hipoteca` y `hipoteca version` emite
+  `{"schema_version":1,"version":"afdda45-dirty",...}`: los `ldflags` tienen destino real.
+
+### Nota sobre Windows y `make`
+
+El review gate levantó la duda de si `make` existe en `windows-latest`. Los hechos la
+refutan: el job `check (windows-latest)` pasó ejecutando `make build` y `make check` en el
+run `40689508544`. No se añade ninguna mitigación para un problema que no ocurre.
 
 ## Progreso
 
-Contenido completo; pendiente la verificación en CI y el review gate.
+Contenido completo, CI verde en los tres sistemas (run `40690111332`), correcciones del
+review gate aplicadas. Pendiente: commit del informe y merge.
 
 ## Siguiente paso
 
-Push, PR, comprobar CI real en los tres sistemas y escribir el informe.
+Commit de las correcciones + informe, push, CI verde con el review gate incluido, merge a
+`dev`.
 
 ## Log
 
@@ -102,3 +122,18 @@ Tras cerrar SPIKE-01, el usuario elige "OPS-01: esqueleto del repo" como siguien
 Este Windows no tiene `make`. En vez de instalar software en la máquina del usuario, el
 Makefile queda como interfaz delgada y `scripts/*.sh` como implementación, que es lo que
 corre la CI. `make check` y `bash scripts/check.sh` hacen exactamente lo mismo.
+
+### L3 · 2026-10-28 · correcciones del review gate
+
+El review de contexto limpio devolvió PASS CON FIXES. Se aplica **una sola ronda**:
+
+- El check restaura `go.mod`/`go.sum` con un `trap` cuando `go mod tidy` falla.
+- `hipoteca` sin subcomando manda la ayuda a **stderr** y falla (P-01), y se desactiva el
+  comando `completion` que cobra añade por defecto y que escribiría shell en stdout.
+- `govulncheck` queda fijado a una versión concreta (el check debe ser reproducible).
+- La detección de ID del review gate pasa a ser insensible a mayúsculas.
+- Se elimina el filtro muerto de `gofmt -l` si se demuestra que lo es.
+
+Descartado con evidencia: el hallazgo sobre `make` en `windows-latest` (el job pasó).
+Aceptado como transitorio: `exit 1` en `main`, que CORE-01 sustituye por los códigos del
+arranque §6.4.
