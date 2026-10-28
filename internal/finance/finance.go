@@ -9,11 +9,14 @@ import (
 
 // Errores centinela de validación de entradas. internal/errs los mapeará a
 // usage/internal en CORE-01.
+//
+// Un tipo de interés negativo NO es error (FIN-02, decisión 3): un préstamo
+// sin suelo con índice negativo produce un TIN negativo y se amortiza con
+// interés mensual negativo.
 var (
 	ErrNegativePrincipal = errors.New("finance: el capital no puede ser negativo")
 	ErrNegativeMonths    = errors.New("finance: el plazo no puede ser negativo")
 	ErrZeroMonths        = errors.New("finance: el plazo debe ser de al menos un mes")
-	ErrNegativeRate      = errors.New("finance: el tipo de interés no puede ser negativo")
 )
 
 var (
@@ -23,7 +26,9 @@ var (
 	ratMonths  = big.NewRat(100*12, 1) // 100 % anual → tipo mensual en un paso
 )
 
-// validate aplica las reglas de entrada comunes a Payment y Amortization.
+// validate aplica las reglas de entrada comunes a Payment y Amortization. El
+// tipo puede ser negativo (decisión 3 de FIN-02): sólo se rechazan un capital
+// negativo y un plazo vacío.
 func validate(principal, annualRate decimal.Decimal, months int) error {
 	if principal.Sign() < 0 {
 		return ErrNegativePrincipal
@@ -33,9 +38,6 @@ func validate(principal, annualRate decimal.Decimal, months int) error {
 	}
 	if months == 0 {
 		return ErrZeroMonths
-	}
-	if annualRate.Sign() < 0 {
-		return ErrNegativeRate
 	}
 	return nil
 }
@@ -63,12 +65,20 @@ func powRat(base *big.Rat, exp int) *big.Rat {
 	return result
 }
 
-// roundHalfUpCents redondea un racional no negativo a un número entero de
-// céntimos, half-up (convención 1.3 de docs/calculos.md): floor(x·100 + 1/2).
+// roundHalfUpCents redondea un racional a un número entero de céntimos,
+// half-up lejos de cero (convención 1.3 de docs/calculos.md), simétrico para
+// ambos signos: se redondea el valor absoluto hacia arriba y se restaura el
+// signo, de modo que −0.005 da −0.01 y no 0.00. Con entradas no negativas el
+// resultado es el de siempre: floor(x·100 + 1/2).
 func roundHalfUpCents(r *big.Rat) *big.Int {
-	scaled := new(big.Rat).Mul(r, ratHundred)
+	abs := new(big.Rat).Abs(r)
+	scaled := new(big.Rat).Mul(abs, ratHundred)
 	shifted := new(big.Rat).Add(scaled, ratHalf)
-	return new(big.Int).Quo(shifted.Num(), shifted.Denom())
+	cents := new(big.Int).Quo(shifted.Num(), shifted.Denom())
+	if r.Sign() < 0 {
+		cents.Neg(cents)
+	}
+	return cents
 }
 
 // centsIntToDecimal convierte un número entero de céntimos en decimal exacto,
@@ -81,9 +91,12 @@ func centsIntToDecimal(cents *big.Int) decimal.Decimal {
 //
 //	C = P · i / (1 − (1 + i)^−n)
 //
-// con i = TIN/100/12. Con i = 0, C = P/n (sin división por cero). La cuota
-// exacta se redondea half-up a céntimos una sola vez. Todo el cálculo interno
-// es math/big.Rat (decisión D-03).
+// con i = TIN/100/12. Con i = 0, C = P/n (sin división por cero). Con
+// i < 0 (préstamo sin suelo con índice negativo, decisión 3 de FIN-02) el
+// interés mensual es negativo: la amortización supera la cuota y el préstamo
+// se cierra antes del mes n por la regla de cierre anticipado de
+// Amortization. La cuota exacta se redondea half-up a céntimos una sola vez.
+// Todo el cálculo interno es math/big.Rat (decisión D-03).
 func Payment(principal, annualRate decimal.Decimal, months int) (decimal.Decimal, error) {
 	if err := validate(principal, annualRate, months); err != nil {
 		return decimal.Decimal{}, err

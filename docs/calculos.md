@@ -43,8 +43,9 @@ reproducen las hojas de cálculo (función PAGO) y `numpy_financial.pmt`.
 
 ### 1.3 Redondeo de la cuota
 
-Half-up a céntimos (`payment_rounding = "half-up-cents"`). La cuota se calcula con
-precisión completa y se redondea **una sola vez**; a partir de ahí es constante. **La
+Half-up a céntimos (`payment_rounding = "half-up-cents"`), entendido como **half-up lejos
+de cero y simétrico para ambos signos**: `0.005` → `0.01` y `−0.005` → `−0.01`. La cuota se
+calcula con precisión completa y se redondea **una sola vez**; a partir de ahí es constante. **La
 última cuota absorbe el residuo** para que el capital final sea exactamente `0.00`.
 
 Justificación: es lo que hace un recibo real (la última cuota casi nunca coincide al
@@ -77,6 +78,16 @@ que difieren en céntimos y hay que elegir una; redondear cada mes es lo más pr
 recibo real, donde cada apunte es un importe con céntimos.
 
 ### 1.5 Revisión, suelo y redondeo de escritura
+
+**Los tipos resultantes pueden ser negativos.** Una hipoteca sin suelo con un índice
+negativo y un diferencial pequeño produce un TIN negativo (`−0.481 + 0.200 = −0.281`). Ese
+caso está soportado y es el de las hipotecas sin suelo de los años de Euríbor negativo: el
+interés mensual es negativo, la amortización supera a la cuota y el préstamo se cierra algo
+antes, con el cuadro terminando en `0.00` igual que cualquier otro. **No** se recorta el TIN
+a cero: hacerlo inventaría un tipo que la escritura no dice (P-06).
+
+El redondeo de escritura del tipo usa la misma regla que la cuota: half-up **lejos de
+cero**, simétrico. `−3.0625` con redondeo `1/8` da `−3.125`, no `−3.000`.
 
 En cada revisión:
 

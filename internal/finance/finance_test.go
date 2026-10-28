@@ -222,6 +222,10 @@ func TestPropertiesOverFixedCases(t *testing.T) {
 	}
 }
 
+// El tipo negativo ya no es error de validación (FIN-02, decisión 3): un
+// préstamo sin suelo con índice negativo produce un TIN negativo y Payment y
+// Amortization lo aceptan (TestNegativeRatePayment, TestNegativeRateSchedule).
+//
 // TestInputValidation comprueba los errores centinela con errors.Is.
 func TestInputValidation(t *testing.T) {
 	principal := decimal.NewFromInt(10000)
@@ -238,9 +242,6 @@ func TestInputValidation(t *testing.T) {
 		if _, err := Payment(principal, rate, 0); !errors.Is(err, ErrZeroMonths) {
 			t.Errorf("meses cero: err = %v, se esperaba ErrZeroMonths", err)
 		}
-		if _, err := Payment(principal, negative, 12); !errors.Is(err, ErrNegativeRate) {
-			t.Errorf("tipo negativo: err = %v, se esperaba ErrNegativeRate", err)
-		}
 	})
 
 	t.Run("Amortization", func(t *testing.T) {
@@ -253,8 +254,48 @@ func TestInputValidation(t *testing.T) {
 		if _, err := Amortization(Loan{Principal: principal, AnnualRate: rate, Months: 0}); !errors.Is(err, ErrZeroMonths) {
 			t.Errorf("meses cero: err = %v, se esperaba ErrZeroMonths", err)
 		}
-		if _, err := Amortization(Loan{Principal: principal, AnnualRate: negative, Months: 12}); !errors.Is(err, ErrNegativeRate) {
-			t.Errorf("tipo negativo: err = %v, se esperaba ErrNegativeRate", err)
-		}
 	})
+}
+
+// TestNegativeRatePayment: un TIN negativo (índice −0.5 % + diferencial 0.2 %,
+// sin suelo: decisión 3 de FIN-02) produce una cuota válida y menor que
+// capital/meses, porque el interés mensual negativo amortiza de más.
+func TestNegativeRatePayment(t *testing.T) {
+	payment, err := Payment(mustDecimal(t, "100000"), mustDecimal(t, "-0.3"), 360)
+	if err != nil {
+		t.Fatalf("Payment con TIN negativo: %v", err)
+	}
+	if !payment.Equal(mustDecimal(t, "265.43")) {
+		t.Errorf("Payment = %s, se esperaba 265.43", payment.String())
+	}
+	perMonth := mustDecimal(t, "100000").Div(mustDecimal(t, "360"))
+	if !payment.LessThan(perMonth) {
+		t.Errorf("Payment %s no es menor que capital/meses %s", payment.String(), perMonth.String())
+	}
+}
+
+// TestRoundHalfUpCentsBothSigns fija el half-up lejos de cero de los céntimos,
+// simétrico para ambos signos: en el punto medio exacto redondea away from
+// zero (0.005 → 0.01 y −0.005 → −0.01); por debajo del punto medio, hacia
+// cero. Para entradas no negativas el resultado es el de siempre.
+func TestRoundHalfUpCentsBothSigns(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"0.005", "0.01"},   // punto medio exacto → arriba
+		{"-0.005", "-0.01"}, // punto medio exacto → abajo (lejos de cero)
+		{"0.015", "0.02"},
+		{"-0.015", "-0.02"},
+		{"0.014", "0.01"},
+		{"-0.014", "-0.01"},
+		{"0.004", "0.00"},
+		{"-0.004", "0.00"},
+	}
+	for _, tc := range tests {
+		got := centsIntToDecimal(roundHalfUpCents(mustDecimal(t, tc.input).Rat()))
+		if !got.Equal(mustDecimal(t, tc.want)) {
+			t.Errorf("roundHalfUpCents(%s) = %s, se esperaba %s", tc.input, got.String(), tc.want)
+		}
+	}
 }
