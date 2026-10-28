@@ -30,7 +30,7 @@ echo "==> go vet"
 go vet ./...
 
 echo "==> staticcheck"
-./scripts/tools.sh >/dev/null
+bash "$ROOT/scripts/tools.sh" >/dev/null
 ./.bin/staticcheck ./...
 
 echo "==> govulncheck"
