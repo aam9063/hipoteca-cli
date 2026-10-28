@@ -9,7 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
 	"go/build"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -148,6 +151,46 @@ func TestExitCodeFor(t *testing.T) {
 			t.Errorf("success never carries an envelope, got %+v", env)
 		}
 	})
+}
+
+// TestSignalWiringIsPresent parses main.go and fails if signal.NotifyContext
+// is not called or if root.ExecuteContext is not used. It exists because the
+// 130 (interrupted) path has no e2e command to interrupt yet: without a
+// long-running command there is no subprocess test that can deliver a signal,
+// so the structural check is the only guard against someone silently removing
+// the wiring and turning every Ctrl+C into a hard exit.
+func TestSignalWiringIsPresent(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filepath.Join(".", "main.go"), nil, 0)
+	if err != nil {
+		t.Fatalf("parsear main.go: %v", err)
+	}
+	var notifyContext, executeContext bool
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		switch sel.Sel.Name {
+		case "NotifyContext":
+			if id, ok := sel.X.(*ast.Ident); ok && id.Name == "signal" {
+				notifyContext = true
+			}
+		case "ExecuteContext":
+			executeContext = true
+		}
+		return true
+	})
+	if !notifyContext {
+		t.Error("main.go ya no llama a signal.NotifyContext: la interrupción (130) quedaría sin cablear")
+	}
+	if !executeContext {
+		t.Error("main.go ya no usa ExecuteContext: el contexto cancelado no llegaría a la ejecución")
+	}
 }
 
 // P-01: `version` writes exactly one JSON value plus its newline to stdout and
