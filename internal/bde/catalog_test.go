@@ -73,6 +73,33 @@ func TestCatalogoOverrideDesconocido(t *testing.T) {
 	}
 }
 
+// TestCatalogoOverrideCodigoVacio: un override a un código vacío deja el índice
+// sin código de serie y envenena byCode; se rechaza nombrando el id.
+func TestCatalogoOverrideCodigoVacio(t *testing.T) {
+	_, err := LoadCatalog(map[string]string{"euribor-1y": ""})
+	if err == nil {
+		t.Fatal("un override a un código vacío debe ser un error, no un índice sin código")
+	}
+	if !strings.Contains(err.Error(), "euribor-1y") {
+		t.Fatalf("el error debe nombrar el id sobrescrito: %s", err.Error())
+	}
+}
+
+// TestCatalogoOverrideColisiona: dos id distintos no pueden compartir código del
+// Banco: byCode (código → id) y la clave de caché colisionarían en silencio.
+func TestCatalogoOverrideColisiona(t *testing.T) {
+	_, err := LoadCatalog(map[string]string{"euribor-1y": "D_1NBAC972"})
+	if err == nil {
+		t.Fatal("un override que colisiona con el código de otro id debe ser un error")
+	}
+	if !strings.Contains(err.Error(), "euribor-1y") || !strings.Contains(err.Error(), "euribor-1m") {
+		t.Fatalf("el error debe nombrar los dos id en colisión: %s", err.Error())
+	}
+	if !strings.Contains(err.Error(), "D_1NBAC972") {
+		t.Fatalf("el error debe nombrar el código en colisión: %s", err.Error())
+	}
+}
+
 // TestCatalogoSeriesAuxiliares: los códigos auxiliares del IRPH salen del
 // catálogo (un fallo de uno de ellos sería api_changed), pero los códigos del
 // BOE que la API no sirve no están en él.
