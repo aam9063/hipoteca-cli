@@ -9,8 +9,9 @@ contra estos casos; ningún agente puede "arreglar" un caso para que pase un tes
 - Generador: `testdata/finance/generate.py` (Python + `decimal.Decimal`, contraste con
   `numpy-financial`). No es código de producto y no entra en el binario.
 - Origen y justificación de los casos: `testdata/finance/README.md`.
-- Los valores de índice de los casos 6 a 8 son **hipotéticos y fijos** (no son datos del
-  Banco de España): sirven para fijar el recálculo de la cuota, el suelo y el redondeo.
+- Los casos 6 a 8 usan valores **reales publicados** del Euríbor a 1 año (Banco de
+  España, serie `D_1NBAF472`, meses de noviembre de 2019 a 2025): ningún índice es
+  hipotético. Ver §3.1.
 
 ---
 
@@ -125,24 +126,44 @@ residuo: `720.70 = 718.84 + 1.86`. Capital final: exactamente `0.00`.
 | 3 | Tipo bajo | 90000.00 · 0.50 % · 180 m | 519.09 | 519.09 | 3435.95 |
 | 4 | Plazo corto, tipo alto | 60000.00 · 6.25 % · 60 m | 1166.96 | 1166.96 | 10017.30 |
 | 5 | Importes feos | 183450.75 · 2.37 % · 347 m | 730.87 | 730.87 | 70160.13 |
-| 6 | Mixta 12 m | 150000.00 · 1.25 % → revisiones anuales, índices hipotéticos + 0.890 · 240 m | 706.70 | 789.13 (tramo 8, TIN 2.140) | 42214.52 |
-| 7 | Suelo | 150000.00 · 3.500 % 12 m → índice 1.500 + 0.890 = 2.390 → suelo 3.000 · 240 m | 869.94 | 833.54 (TIN 3.000) | 50486.52 |
-| 8 | Redondeo 1/8 | 150000.00 · 3.101 % 12 m → índice 2.211 + 0.890 = 3.101 → 3.125 · 240 m | 839.50 | 841.23 (TIN 3.125) | 51875.54 |
+| 6 | Mixta 12 m | 150000.00 · 1.25 % 12 m → 7 revisiones anuales, Euríbor real (nov) + 0.890 · 96 m | 1642.74 | 1606.79 (TIN 0.618) | 9660.61 |
+| 7 | Suelo | 150000.00 · 3.500 % 12 m → Euríbor real (nov) + 0.500, suelo 3.000 · 96 m | 1793.71 | 1763.47 (TIN 3.000, suelo) | 20702.07 |
+| 8 | Redondeo 1/8 | 150000.00 · 3.100 % 12 m → Euríbor real (nov) + 0.890, redondeo 1/8 · 96 m | 1766.26 | 1621.28 (TIN 0.625) | 12315.87 |
 | 9 | Amortiza, reduce-payment | como caso 1; amortiza 10000.00 tras la cuota 60, comisión 0 % | 719.14 | 663.18 | 62312.38 (ahorro 3431.18) |
 | 10 | Amortiza, reduce-term | como caso 1; amortiza 10000.00 tras la cuota 60, comisión 0 % | 719.14 | 719.14 (última: 694.82; plazo 275 m, 25 menos) | 57739.18 (ahorro 8004.38) |
 
 Notas de la tabla:
 
 - En los casos 6 a 8 la cuota inicial es la del tramo inicial y la "cuota tras el cambio"
-  la de la primera revisión (mes 13). Los tramos completos del caso 6 están en el JSON
-  (`expected.revisions`): TIN 2.390 → 782.90, 2.890 → 816.13, 3.390 → 848.46,
-  3.890 → 879.78, 3.640 → 864.90, 3.140 → 837.36, 2.640 → 812.12, 2.140 → 789.13.
+  la de la primera revisión (mes 13, TIN con el Euríbor de noviembre 2019). Los tramos
+  completos del caso 6 están en el JSON (`expected.revisions`): TIN 0.618 → 1606.79,
+  0.409 → 1596.67, 0.403 → 1596.42, 3.718 → 1706.47, 4.912 → 1737.39, 3.396 → 1710.61,
+  3.107 → 1707.96 (la última cuota del cuadro absorbe el residuo: 1707.97).
+- En el caso 7 el suelo de 3.000 muerde en 4 de las 7 revisiones (0.228, 0.019, 0.013 y
+  2.717 → 3.000) y no muerde en 3.328, 4.522 y 3.006. En el caso 8 las 7 revisiones
+  cambian el TIN por el redondeo a 1/8: 0.618→0.625, 0.409→0.375, 0.403→0.375,
+  3.718→3.750, 4.912→4.875, 3.396→3.375, 3.107→3.125.
 - En los casos 9 y 10 el interés total se compara con el caso 1 (el mismo préstamo sin
   amortizar: 65743.56). El ahorro es diferencia de intereses, nunca una recomendación
   (P-08): decidir entre reducir cuota o plazo es del usuario.
 - En los casos 9 y 10 la suma de amortizaciones del cuadro es 140000.00; junto con la
   amortización anticipada de 10000.00 suma el capital original de 150000.00. El JSON lo
   explicita (`sum_principal_repaid_schedule_only`).
+
+### 3.1. De dónde salen los índices de los casos 6 a 8
+
+Los tres casos comparten la misma forma: préstamo de `150000.00` desde `2019-01-01`
+(cobro el día 1), 96 meses, tramo inicial de 12 meses y revisiones anuales con un
+**desfase de referencia de 2 meses** (`reference_offset_months: 2`), como fija la
+escritura. Por eso cada revisión usa el **Euríbor de noviembre del año anterior**: las
+siete revisiones (2020-01 a 2026-01) usan los valores de noviembre de 2019 a 2025.
+
+Los siete valores son **publicados** por el Banco de España (serie `D_1NBAF472`,
+Euríbor a 1 año, captura local `testdata/bde/listaSeries-euribor-1y-MAX.json` del
+2026-10-28): -0.272, -0.481, -0.487, 2.828, 4.022, 2.506 y 2.217. El generador verifica
+cada mes y cada valor contra esa captura **antes** de calcular nada: si un valor o un mes
+no coincide con lo publicado, aborta sin escribir ningún caso. Así la procedencia es
+auditable: un valor real que no esté en la captura del Banco invalida la generación.
 
 ## 4. Cómo se generaron y cómo se contrastan
 
@@ -154,7 +175,10 @@ Cada JSON de `testdata/finance/` se escribió ejecutando el generador, nunca a m
    métodos difieren en más de `0.01`, el generador **falla y no escribe ningún caso**.
    En `reduce-term` se comprueba además que el plazo resultante es el mínimo que cierra
    el préstamo con la cuota mantenida.
-3. **Determinismo:** ejecutar el generador dos veces produce archivos idénticos byte a
+3. **Procedencia de los índices:** en los casos 6 a 8, cada mes y valor de índice se
+   verifica contra la captura del Banco de España (`testdata/bde/`, serie `D_1NBAF472`);
+   ver §3.1.
+4. **Determinismo:** ejecutar el generador dos veces produce archivos idénticos byte a
    byte (fecha de generación fija `2026-10-28`, sin timestamps volátiles).
 
 Cada JSON lleva en `source`: versiones de Python/NumPy/numpy-financial, métodos usados,

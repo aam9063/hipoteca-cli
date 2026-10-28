@@ -76,7 +76,7 @@
   },
   "source": {
     "generator": "testdata/finance/generate.py",
-    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generator_sha256": "66de1b3179e2163adcb47e88f91ff9a20bdc06826a83d4afcd54c32e207c6056",
     "generated_at": "2026-10-28",
     "python_version": "3.14.5",
     "numpy_version": "2.5.4",
