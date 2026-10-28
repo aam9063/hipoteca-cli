@@ -62,7 +62,11 @@ func TestWriteFileAtomicFailureDirIsFile(t *testing.T) {
 	if err := writeFileAtomic(path, []byte("data"), 0o600); err == nil {
 		t.Fatal("writeFileAtomic() error = nil, want an error")
 	}
-	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+	// El padre es un archivo, así que Stat falla con ENOTDIR en Unix y con
+	// ERROR_PATH_NOT_FOUND en Windows. Ninguno de los dos es ErrNotExist para
+	// os.IsNotExist, pero en ambos casos el destino no existe: lo que importa es
+	// que Stat no lo encuentre.
+	if _, statErr := os.Stat(path); statErr == nil {
 		t.Fatal("destination exists after a failed write; want it absent")
 	}
 	assertNoTempLeftover(t, dir)
