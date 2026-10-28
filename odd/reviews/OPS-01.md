@@ -19,6 +19,12 @@
   de alcance). No se inventa evidencia de terceros: todo lo que sigue es observado o
   referenciado con su identificador.
 
+> **Hashes finales:** este informe describe el rango revisado en la rama. Tras el merge
+> con rebase a `dev`, los commits quedaron como `9b20b47` (bit de ejecución), `a4be17a`
+> (esta ronda de correcciones) y `eca15ed` (este informe). La evidencia final es el run
+> `40691442162`: `check` en ubuntu, macos y windows más `review gate report`, todos en
+> success.
+
 ## Verificación ejecutada
 
 ### Ronda 1 (informe inicial)
