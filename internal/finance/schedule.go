@@ -1,10 +1,21 @@
 package finance
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/shopspring/decimal"
 )
+
+// ErrUnpayableSchedule: la cuota redondeada a céntimos es 0.00 teniendo capital
+// pendiente, así que no existe un plan de amortización mensual que representar:
+// todas las mensualidades serían de 0.00 y el capital sólo se cerraría por la
+// absorción del residuo en la última. Ojo: el préstamo *sí* se cerraría en esa
+// última cuota; lo que se rechaza es presentar un cuadro sin progreso como si
+// fuera un plan de pagos. Sólo aparece con importes o tipos irreales (por
+// ejemplo un capital de 0.01 o un tipo de -50 %), nunca en una hipoteca.
+var ErrUnpayableSchedule = errors.New("finance: la cuota redondeada a céntimos es 0.00 con capital pendiente: no hay un plan de amortización mensual que representar")
 
 // Loan son los datos de entrada del cuadro de amortización.
 type Loan struct {
@@ -47,6 +58,11 @@ type Schedule struct {
 // negativo) el interés mensual es negativo y la amortización de cada mes
 // supera la cuota, de modo que el préstamo cierra algo antes: la misma regla
 // de cierre de arriba lo cubre, sin cambios en el bucle.
+//
+// Con un tipo tan negativo que la cuota redondeada a céntimos es 0.00, en la
+// mensualidad en la que el interés del mes también redondea a 0.00 la
+// amortización sería 0.00 y el préstamo quedaría bloqueado: se devuelve
+// ErrUnpayableSchedule en lugar de emitir filas sin progreso.
 func Amortization(loan Loan) (Schedule, error) {
 	payment, err := Payment(loan.Principal, loan.AnnualRate, loan.Months)
 	if err != nil {
@@ -64,6 +80,12 @@ func Amortization(loan Loan) (Schedule, error) {
 
 		var pay, principalRepaid decimal.Decimal
 		scheduledPrincipal := payment.Sub(interest)
+		if payment.IsZero() && balance.Sign() > 0 && interest.IsZero() {
+			// La cuota redondeada es 0.00 y el interés del mes también: la
+			// amortización sería 0.00 en todas las mensualidades.
+			return Schedule{}, fmt.Errorf("%w (cuota %s, tipo %s %%)",
+				ErrUnpayableSchedule, payment.String(), loan.AnnualRate.String())
+		}
 		switch {
 		case month == loan.Months || scheduledPrincipal.GreaterThanOrEqual(balance):
 			// La última cuota absorbe el residuo: paga el capital pendiente
