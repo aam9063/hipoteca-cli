@@ -1,0 +1,20 @@
+# Binarios y artefactos de build
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Cobertura
+*.cover
+coverage.*
+
+# Entorno local
+.env
+.env.*
+
+# Editores / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
