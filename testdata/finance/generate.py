@@ -8,6 +8,13 @@ ROUND_HALF_UP a céntimos, implementa las convenciones de
 ``numpy_financial.pmt``. Si los dos métodos discrepan en más de 0.01,
 falla de forma ruidosa y NO escribe ningún caso.
 
+Los casos 6 a 8 usan valores REALES del Euríbor a 1 año publicados por
+el Banco de España (meses de noviembre de 2019 a 2025). Antes de
+calcular nada, el generador verifica cada valor contra la captura local
+``testdata/bde/listaSeries-euribor-1y-MAX.json`` (serie D_1NBAF472);
+si un mes o un valor no coincide con la captura del Banco, aborta sin
+escribir nada.
+
 Este generador NO es código de producto: documenta el origen externo de
 los casos de referencia. Ningún caso se edita a mano para que un test
 pase (docs/ARRANQUE.md §9): si un caso discrepa, se para y se pregunta.
@@ -41,6 +48,8 @@ ZERO = Decimal("0.00")
 CROSSCHECK_TOLERANCE = Decimal("0.01")
 GENERATED_AT = "2026-10-28"  # fecha fija del spike: nada de timestamps volátiles
 OUT_DIR = Path(__file__).resolve().parent
+BDE_FIXTURE = OUT_DIR.parent / "bde" / "listaSeries-euribor-1y-MAX.json"
+EURIBOR_SERIES = "D_1NBAF472"
 INTEREST_CONVENTION = "monthly-nominal"
 PAYMENT_ROUNDING = "half-up-cents"
 
@@ -140,6 +149,74 @@ def crosscheck_reduce_term(label: str, principal: Decimal, i: Decimal,
 
 
 # ---------------------------------------------------------------------------
+# Procedencia de los índices reales (captura del Banco de España)
+# ---------------------------------------------------------------------------
+
+def load_bde_fixture() -> dict:
+    """Carga la captura local del Euríbor a 1 año del Banco de España.
+
+    Devuelve {"YYYY-MM": Decimal(valor)} a partir de la serie
+    D_1NBAF472. Las fechas vienen en formato ISO con hora; se agrupan por
+    mes (YYYY-MM).
+    """
+    data = json.loads(BDE_FIXTURE.read_text(encoding="utf-8"))
+    series = next((s for s in data if s.get("serie") == EURIBOR_SERIES), None)
+    if series is None:
+        fail(f"la serie {EURIBOR_SERIES} no está en {BDE_FIXTURE}")
+    dates = series["fechas"]
+    values = series["valores"]
+    if len(dates) != len(values):
+        fail(f"fechas y valores desalineados en {BDE_FIXTURE}")
+    return {date[:7]: Decimal(str(value)) for date, value in zip(dates, values)}
+
+
+def verify_published_indices(case_id: str, index_entries: list) -> None:
+    """Verifica cada índice declarado contra la captura del Banco de España.
+
+    Si el mes de referencia no está en la captura, o el valor no coincide
+    exactamente con el publicado, aborta sin escribir ningún caso: la
+    procedencia tiene que ser auditable contra los datos del propio Banco.
+    """
+    fixture = load_bde_fixture()
+    for entry in index_entries:
+        month = entry["reference_month"]
+        declared = D(entry["value"])
+        if month not in fixture:
+            fail(
+                f"{case_id}: el mes de referencia {month} no existe en la "
+                f"captura del Banco de España ({BDE_FIXTURE}, serie "
+                f"{EURIBOR_SERIES}); NO se escribe ningún caso"
+            )
+        published = fixture[month]
+        if published != declared:
+            fail(
+                f"{case_id}: {month} declara índice {declared} pero la captura "
+                f"del Banco de España ({BDE_FIXTURE}, serie {EURIBOR_SERIES}) "
+                f"publica {published}; NO se escribe ningún caso"
+            )
+        if entry.get("status") != "published" or entry.get("series") != EURIBOR_SERIES:
+            fail(
+                f"{case_id}: la entrada de {month} no está marcada como "
+                f"'published' de la serie {EURIBOR_SERIES}"
+            )
+
+
+def euribor_entries(months_values: list) -> list:
+    """Construye las entradas de índice con procedencia completa a partir
+    de pares (mes de referencia, valor publicado)."""
+    return [
+        {
+            "revision": position,
+            "reference_month": month,
+            "value": value,
+            "status": "published",
+            "series": EURIBOR_SERIES,
+        }
+        for position, (month, value) in enumerate(months_values, start=1)
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Simulación del cuadro (convenciones 3, 4 y 6)
 # ---------------------------------------------------------------------------
 
@@ -188,7 +265,7 @@ def simulate_fixed(principal: Decimal, tin_pct: Decimal, term: int):
 
 def simulate_with_revisions(principal: Decimal, term: int, initial_rate: str,
                             initial_period: int, revision_every: int,
-                            index_values: list, spread: str,
+                            index_entries: list, spread: str,
                             floor: Optional[str], step: Optional[Decimal]):
     """Tramo inicial fijo + revisiones periódicas (convención 5).
 
@@ -210,9 +287,10 @@ def simulate_with_revisions(principal: Decimal, term: int, initial_rate: str,
     rev_idx = 0
     next_rev_month = initial_period + 1
     while P > 0:
-        if month + 1 >= next_rev_month and rev_idx < len(index_values):
+        if month + 1 >= next_rev_month and rev_idx < len(index_entries):
             remaining = term - month
-            index_value = D(index_values[rev_idx])
+            entry = index_entries[rev_idx]
+            index_value = D(entry["value"])
             tin_raw = index_value + D(spread)
             if floor is not None:
                 tin_after_floor = max(tin_raw, D(floor))
@@ -228,8 +306,10 @@ def simulate_with_revisions(principal: Decimal, term: int, initial_rate: str,
             segments.append({
                 "revision_number": rev_idx + 1,
                 "first_month": month + 1,
+                "reference_month": entry["reference_month"],
                 "index_value": fmt_rate(index_value),
-                "index_value_status": "assumed-hypothetical",
+                "index_value_status": entry["status"],
+                "index_series": entry["series"],
                 "spread": spread,
                 "tin_raw": fmt_rate(tin_raw),
                 "tin_after_floor": fmt_rate(tin_after_floor),
@@ -366,8 +446,12 @@ def generator_sha256() -> str:
     return hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
 
 
-def source_block(methods: list) -> dict:
-    return {
+def fixture_sha256() -> str:
+    return hashlib.sha256(BDE_FIXTURE.read_bytes()).hexdigest()
+
+
+def source_block(methods: list, index_fixture: bool = False) -> dict:
+    block = {
         "generator": "testdata/finance/generate.py",
         "generator_sha256": generator_sha256(),
         "generated_at": GENERATED_AT,
@@ -379,6 +463,14 @@ def source_block(methods: list) -> dict:
         "payment_rounding": PAYMENT_ROUNDING,
         "crosscheck_tolerance": "0.01",
     }
+    if index_fixture:
+        block["index_fixture"] = {
+            "path": "testdata/bde/listaSeries-euribor-1y-MAX.json",
+            "series": EURIBOR_SERIES,
+            "sha256": fixture_sha256(),
+            "captured_at": GENERATED_AT,
+        }
+    return block
 
 
 METHODS_BASE = [
@@ -411,12 +503,20 @@ def fixed_case(case_id: str, description: str, principal: str, tin: str,
 
 def revision_case(case_id: str, description: str, principal: str, term: int,
                   initial_rate: str, initial_period: int, revision_every: int,
-                  index_values: list, spread: str, floor: Optional[str],
+                  index_entries: list, spread: str, floor: Optional[str],
                   rate_rounding: str) -> dict:
+    """Caso con revisiones usando índices reales verificados.
+
+    Los meses de referencia y los valores de ``index_entries`` se
+    contrastan contra la captura del Banco de España antes de calcular
+    nada: si no coinciden, ``verify_published_indices`` aborta sin
+    escribir ningún archivo.
+    """
+    verify_published_indices(case_id, index_entries)
     step = Decimal("0.125") if rate_rounding == "1/8" else None
     rows, pay0, segments = simulate_with_revisions(
         D(principal), term, initial_rate, initial_period, revision_every,
-        index_values, spread, floor, step,
+        index_entries, spread, floor, step,
     )
     expected = expected_common(rows)
     expected["initial_payment"] = fmt_money(pay0)
@@ -427,23 +527,36 @@ def revision_case(case_id: str, description: str, principal: str, term: int,
     inputs = {
         "principal": principal,
         "term_months": term,
+        "loan_start": "2019-01-01",
+        "payment_day": 1,
         "initial_rate": initial_rate,
         "initial_period_months": initial_period,
         "revision_every_months": revision_every,
-        "index_values": index_values,
-        "index_values_status": "assumed-hypothetical",
+        "reference_offset_months": 2,
+        "index_values": index_entries,
+        "index_values_status": "published",
+        "index_source": (
+            "Banco de España, serie " + EURIBOR_SERIES
+            + " (Euríbor a 1 año), captura testdata/bde/"
+        ),
         "spread": spread,
         "floor_rate": floor,
         "rate_rounding": rate_rounding,
         "interest_convention": INTEREST_CONVENTION,
         "payment_rounding": PAYMENT_ROUNDING,
     }
+    methods = list(METHODS_BASE)
+    methods.append(
+        "verificación de cada mes y valor de índice contra la captura del "
+        "Banco de España testdata/bde/listaSeries-euribor-1y-MAX.json "
+        "(serie " + EURIBOR_SERIES + ")"
+    )
     return {
         "id": case_id,
         "description": description,
         "inputs": inputs,
         "expected": expected,
-        "source": source_block(METHODS_BASE),
+        "source": source_block(methods, index_fixture=True),
     }
 
 
@@ -527,27 +640,48 @@ def build_all_cases() -> list:
         ),
         revision_case(
             "case-06-mixta-12m",
-            "Mixta: 12 meses al 1.25 % y luego revisiones anuales. "
-            "Los valores de índice son hipotéticos y fijos (no son datos del "
-            "Banco de España): fijan el recálculo de la cuota en cada tramo.",
-            "150000.00", 240, "1.25", 12, 12,
-            ["1.500", "2.000", "2.500", "3.000", "2.750", "2.250", "1.750", "1.250"],
+            "Mixta: 12 meses al 1.25 % y luego 7 revisiones anuales. "
+            "Índices reales del Euríbor a 1 año (noviembre 2019-2025, Banco "
+            "de España, serie D_1NBAF472), sin ningún valor hipotético: "
+            "incluye el estrés real de 2023-2024 (TIN 4.912).",
+            "150000.00", 96, "1.25", 12, 12,
+            euribor_entries([
+                ("2019-11", "-0.272"), ("2020-11", "-0.481"),
+                ("2021-11", "-0.487"), ("2022-11", "2.828"),
+                ("2023-11", "4.022"), ("2024-11", "2.506"),
+                ("2025-11", "2.217"),
+            ]),
             "0.890", None, "none",
         ),
         revision_case(
             "case-07-suelo",
-            "Revisión con suelo: índice 1.500 + diferencial 0.890 = 2.390, "
-            "el suelo de 3.000 muerde y se aplica antes del redondeo de escritura.",
-            "150000.00", 240, "3.500", 12, 12,
-            ["1.500"],
-            "0.890", "3.000", "none",
+            "Revisión con suelo de 3.000: el suelo muerde en 4 de las 7 "
+            "revisiones (0.228, 0.019, 0.013 y 2.717 → 3.000) y no muerde en "
+            "3.328, 4.522 y 3.006. Índices reales del Euríbor a 1 año "
+            "(noviembre 2019-2025, Banco de España, serie D_1NBAF472).",
+            "150000.00", 96, "3.500", 12, 12,
+            euribor_entries([
+                ("2019-11", "-0.272"), ("2020-11", "-0.481"),
+                ("2021-11", "-0.487"), ("2022-11", "2.828"),
+                ("2023-11", "4.022"), ("2024-11", "2.506"),
+                ("2025-11", "2.217"),
+            ]),
+            "0.500", "3.000", "none",
         ),
         revision_case(
             "case-08-redondeo-octavo",
-            "Redondeo de escritura 1/8: índice 2.211 + diferencial 0.890 = 3.101 "
-            "→ múltiplo de 0.125 más próximo, half-up → 3.125.",
-            "150000.00", 240, "3.101", 12, 12,
-            ["2.211"],
+            "Redondeo de escritura 1/8 en cada revisión (7 de 7 cambian el "
+            "TIN por redondeo: 0.618→0.625, 0.409→0.375, 0.403→0.375, "
+            "3.718→3.750, 4.912→4.875, 3.396→3.375, 3.107→3.125). Índices "
+            "reales del Euríbor a 1 año (noviembre 2019-2025, Banco de "
+            "España, serie D_1NBAF472).",
+            "150000.00", 96, "3.100", 12, 12,
+            euribor_entries([
+                ("2019-11", "-0.272"), ("2020-11", "-0.481"),
+                ("2021-11", "-0.487"), ("2022-11", "2.828"),
+                ("2023-11", "4.022"), ("2024-11", "2.506"),
+                ("2025-11", "2.217"),
+            ]),
             "0.890", None, "1/8",
         ),
         early_repayment_case(
