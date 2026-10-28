@@ -1,6 +1,7 @@
 package bde
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -152,7 +153,7 @@ var valoresCatorce = map[string]string{
 
 func TestLatestCatorceIndices(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
-	obs, err := c.Latest(idsCatorce)
+	obs, err := c.Latest(context.Background(), idsCatorce)
 	assertNoErr(t, err)
 	if len(obs) != 14 {
 		t.Fatalf("se esperaban 14 observaciones, hubo %d", len(obs))
@@ -190,7 +191,7 @@ func TestLatestCatorceIndices(t *testing.T) {
 func TestLatestAuxiliaresMezclaExitoYError(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "favoritas-series-auxiliares.json"), 0)
 	codes := []string{"D_1T9H0000A", "D_1T9H0000B", "D_1T9H0000C", "D_1TFECHABOE", "D_1TFECHABOE2", "D_1TFECHABOE3", "D_1TFECHABOE4"}
-	obs, err := c.LatestCodes(codes)
+	obs, err := c.LatestCodes(context.Background(), codes)
 	assertErr(t, err, errs.KindNotFound, 4)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("peticiones = %d, se esperaba 1", got)
@@ -215,7 +216,7 @@ func TestLatestAuxiliaresMezclaExitoYError(t *testing.T) {
 // forzado que no está en el catálogo → not_found/4.
 func TestLatestSerieInexistenteArray(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "error-favoritas-serie-inexistente.json"), 0)
-	obs, err := c.LatestCodes([]string{"XX"})
+	obs, err := c.LatestCodes(context.Background(), []string{"XX"})
 	assertErr(t, err, errs.KindNotFound, 4)
 	if len(obs) != 0 {
 		t.Fatalf("no se esperaban observaciones, hubo %d", len(obs))
@@ -230,7 +231,7 @@ func TestLatestSerieInexistenteArray(t *testing.T) {
 func TestLatestCodigoDeCatalogoEsAPIChanged(t *testing.T) {
 	body := []byte(`[{"codigo":"D_1NBAF472","errNum":404}]`)
 	ts, c := newFixtureClient(t, body, 0)
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertErr(t, err, errs.KindAPIChanged, 7)
 	if ts.hits.Load() != 1 {
 		t.Fatalf("peticiones = %d, se esperaba 1", ts.hits.Load())
@@ -241,16 +242,123 @@ func TestLatestCodigoDeCatalogoEsAPIChanged(t *testing.T) {
 // ocurrir con un cliente que siempre la envía → api_changed/7.
 func TestLatestFavoritasSinSeries(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "error-favoritas-sin-series.json"), 0)
-	_, err := c.LatestCodes([]string{"D_1NBAF472"})
+	_, err := c.LatestCodes(context.Background(), []string{"D_1NBAF472"})
 	assertErr(t, err, errs.KindAPIChanged, 7)
 	if ts.hits.Load() != 1 {
 		t.Fatalf("peticiones = %d, se esperaba 1", ts.hits.Load())
 	}
 }
 
+// favoritaOK construye un elemento de éxito de favoritas como JSON, para los
+// tests de orden y cardinalidad del array.
+func favoritaOK(code, valor string) string {
+	return `{"serie":"` + code + `","codFrecuencia":"M","decimales":3,"fechaValor":"2026-09-01T08:15:00Z","valor":` + valor + `}`
+}
+
+// TestLatestFavoritasArrayIncompletoEsAPIChanged: un array vacío o con menos
+// elementos que códigos pedidos es un contrato roto (docs/series.md §3.1, §6),
+// no un éxito con datos que faltan que acabaría en la caché.
+func TestLatestFavoritasArrayIncompletoEsAPIChanged(t *testing.T) {
+	casos := []struct{ name, body string }{
+		{"array vacío", `[]`},
+		{"array corto", "[" + favoritaOK("D_1NBAF472", "3.247") + "]"},
+	}
+	for _, tc := range casos {
+		t.Run(tc.name, func(t *testing.T) {
+			_, c := newFixtureClient(t, []byte(tc.body), 0)
+			obs, err := c.LatestCodes(context.Background(), []string{"D_1NBAF472", "D_1NBAC972"})
+			assertErr(t, err, errs.KindAPIChanged, 7)
+			if len(obs) != 0 {
+				t.Fatalf("un contrato roto no devuelve observaciones; hubo %d", len(obs))
+			}
+			if !strings.Contains(err.Error(), "D_1NBAF472") || !strings.Contains(err.Error(), "D_1NBAC972") {
+				t.Fatalf("el error debe nombrar lo esperado y lo llegado: %s", err.Error())
+			}
+		})
+	}
+}
+
+// TestLatestFavoritasArrayFueraDeOrdenEsAPIChanged: el array sigue el orden de
+// los códigos pedidos (§3.1); un código duplicado o fuera de orden es un
+// contrato roto, aunque el número de elementos cuadre.
+func TestLatestFavoritasArrayFueraDeOrdenEsAPIChanged(t *testing.T) {
+	casos := []struct{ name, body string }{
+		{"fuera de orden", "[" + favoritaOK("D_1NBAC972", "2.414") + "," + favoritaOK("D_1NBAF472", "3.247") + "]"},
+		{"código duplicado", "[" + favoritaOK("D_1NBAF472", "3.247") + "," + favoritaOK("D_1NBAF472", "3.247") + "]"},
+	}
+	for _, tc := range casos {
+		t.Run(tc.name, func(t *testing.T) {
+			_, c := newFixtureClient(t, []byte(tc.body), 0)
+			obs, err := c.LatestCodes(context.Background(), []string{"D_1NBAF472", "D_1NBAC972"})
+			assertErr(t, err, errs.KindAPIChanged, 7)
+			if len(obs) != 0 {
+				t.Fatalf("un contrato roto no devuelve observaciones; hubo %d", len(obs))
+			}
+			if !strings.Contains(err.Error(), "D_1NBAF472") || !strings.Contains(err.Error(), "D_1NBAC972") {
+				t.Fatalf("el error debe nombrar lo esperado y lo llegado: %s", err.Error())
+			}
+		})
+	}
+}
+
+// TestLatestErrorObjetoClasificaPorCatalogo: un objeto de error de favoritas
+// sobre un código del catálogo es un contrato roto (api_changed/7); sobre un
+// código forzado que no está en el catálogo sigue siendo not_found/4.
+func TestLatestErrorObjetoClasificaPorCatalogo(t *testing.T) {
+	t.Run("código del catálogo", func(t *testing.T) {
+		_, c := newFixtureClient(t, fixture(t, "error-listaSeries-serie-inexistente.json"), 0)
+		_, err := c.LatestCodes(context.Background(), []string{"D_1NBAF472"})
+		assertErr(t, err, errs.KindAPIChanged, 7)
+		if !strings.Contains(err.Error(), "D_1NBAF472") {
+			t.Fatalf("el error debe nombrar la serie del catálogo: %s", err.Error())
+		}
+	})
+	t.Run("código forzado fuera del catálogo", func(t *testing.T) {
+		_, c := newFixtureClient(t, fixture(t, "error-listaSeries-serie-inexistente.json"), 0)
+		_, err := c.LatestCodes(context.Background(), []string{"XX"})
+		assertErr(t, err, errs.KindNotFound, 4)
+	})
+}
+
+// TestLatestContextoCancelado: un Ctrl+C (signal.NotifyContext → ctx.Err())
+// debe devolver cancelled/2 en cuanto se cancela la petición, no network/6
+// (docs/series.md §6.4): una cancelación no es un fallo de conexión.
+func TestLatestContextoCancelado(t *testing.T) {
+	srv := httptestNewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second) // petición en vuelo cuando llega la cancelación
+	})
+	c := newTestClient(t, srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	start := time.Now()
+	_, err := c.Latest(ctx, idsCatorce)
+	assertErr(t, err, errs.KindCancelled, 2)
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("la llamada debía volver al cancelar el contexto; tardó %v", d)
+	}
+}
+
+// TestLatestBackoffInterrumpible: la espera del reintento único se corta con el
+// contexto: tras un Ctrl+C no se duerme el backoff completo.
+func TestLatestBackoffInterrumpible(t *testing.T) {
+	srv := httptestNewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	c := newTestClient(t, srv.URL)
+	c.retryWait = 10 * time.Second
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	start := time.Now()
+	_, err := c.Latest(ctx, idsCatorce)
+	assertErr(t, err, errs.KindCancelled, 2)
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("el backoff debía cortarse al cancelar el contexto; la llamada tardó %v", d)
+	}
+}
+
 func TestLatestSinIds(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("[]"), 0)
-	_, err := c.Latest(nil)
+	_, err := c.Latest(context.Background(), nil)
 	assertErr(t, err, errs.KindUsage, 2)
 	if ts.hits.Load() != 0 {
 		t.Fatalf("no debió haber petición; hubo %d", ts.hits.Load())
@@ -260,7 +368,7 @@ func TestLatestSinIds(t *testing.T) {
 // TestLatestCuerpoHTML: la ruta inexistente del Banco responde HTML con 400.
 func TestLatestCuerpoHTML(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("<html><body>página de error del sitio</body></html>"), http.StatusBadRequest)
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertErr(t, err, errs.KindAPIChanged, 7)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("peticiones = %d, se esperaba 1", got)
@@ -269,7 +377,7 @@ func TestLatestCuerpoHTML(t *testing.T) {
 
 func TestLatest500ReintentaUnaVez(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("error interno"), http.StatusInternalServerError)
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertErr(t, err, errs.KindUpstreamUnavailable, 5)
 	if got := ts.hits.Load(); got != 2 {
 		t.Fatalf("peticiones = %d, se esperaban 2 (un reintento, nunca más)", got)
@@ -278,7 +386,7 @@ func TestLatest500ReintentaUnaVez(t *testing.T) {
 
 func TestLatest429EsRateLimited(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("demasiadas peticiones"), http.StatusTooManyRequests)
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertErr(t, err, errs.KindRateLimited, 5)
 	if got := ts.hits.Load(); got != 2 {
 		t.Fatalf("peticiones = %d, se esperaban 2 (un reintento, nunca más)", got)
@@ -298,7 +406,7 @@ func TestLatest500LuegoExito(t *testing.T) {
 		_, _ = w.Write(fx)
 	})
 	c := newTestClient(t, srv.URL)
-	obs, err := c.Latest([]string{"euribor-1y"})
+	obs, err := c.Latest(context.Background(), idsCatorce)
 	assertNoErr(t, err)
 	if got := obsByCode(t, obs, "D_1NBAF472").Value.String(); got != "3.247" {
 		t.Fatalf("el reintento debía devolver el valor 3.247; hubo %q", got)
@@ -313,13 +421,13 @@ func TestLatestConexionRechazada(t *testing.T) {
 	url := srv.URL
 	srv.Close() // el puerto queda cerrado: conexión rechazada, sin caché
 	c := newTestClient(t, url)
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertErr(t, err, errs.KindNetwork, 6)
 }
 
 func TestLatestIdDesconocido(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("[]"), 0)
-	_, err := c.Latest([]string{"indice-inventado"})
+	_, err := c.Latest(context.Background(), []string{"indice-inventado"})
 	assertErr(t, err, errs.KindNotFound, 4)
 	if !strings.Contains(err.Error(), "indice-inventado") {
 		t.Fatalf("el error debe nombrar el id: %s", err.Error())

@@ -1,6 +1,7 @@
 package bde
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -19,21 +20,30 @@ func newTestCache(t *testing.T) (*Cache, *time.Time) {
 	return c, &now
 }
 
+// cuerpoFavoritasUno construye la respuesta de favoritas para un solo código,
+// con el valor y la fecha del fixture real (3.247 en 2026-09): la cardinalidad
+// estricta de docs/series.md §3.1 exige un elemento por código pedido, y estos
+// tests piden sólo euribor-1y, así que la clave de caché sigue siendo
+// "D_1NBAF472" y sus aserciones no cambian.
+func cuerpoFavoritasUno() []byte {
+	return []byte("[" + favoritaOK("D_1NBAF472", "3.247") + "]")
+}
+
 func TestCacheUltimoValorCaducaA24h(t *testing.T) {
-	ts, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
+	ts, c := newFixtureClient(t, cuerpoFavoritasUno(), 0)
 	cache, now := newTestCache(t)
 	c.cache = cache
 
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
-	_, err = c.Latest([]string{"euribor-1y"})
+	_, err = c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("la segunda llamada dentro de la TTL no debe tocar el servidor; peticiones = %d", got)
 	}
 
 	*now = now.Add(25 * time.Hour)
-	_, err = c.Latest([]string{"euribor-1y"})
+	_, err = c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 2 {
 		t.Fatalf("pasadas 24 h la entrada debe caducar y refrescar; peticiones = %d", got)
@@ -47,11 +57,11 @@ func TestCacheHistoricoCerradoNoCaduca(t *testing.T) {
 
 	r, err := RangoAnio(2025)
 	assertNoErr(t, err)
-	s1, err := c.History("euribor-1y", r)
+	s1, err := c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 
 	*now = now.Add(1000 * time.Hour) // meses enteros: el año 2025 ya está cerrado
-	s2, err := c.History("euribor-1y", r)
+	s2, err := c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("el histórico cerrado no debe caducar nunca; peticiones = %d", got)
@@ -65,16 +75,16 @@ func TestCacheHistoricoAbiertoCaduca(t *testing.T) {
 	cache, now := newTestCache(t)
 	c.cache = cache
 
-	_, err := c.History("euribor-1y", Rango30M)
+	_, err := c.History(context.Background(), "euribor-1y", Rango30M)
 	assertNoErr(t, err)
-	_, err = c.History("euribor-1y", Rango30M)
+	_, err = c.History(context.Background(), "euribor-1y", Rango30M)
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("dentro de la TTL debe servirse de caché; peticiones = %d", got)
 	}
 
 	*now = now.Add(25 * time.Hour)
-	_, err = c.History("euribor-1y", Rango30M)
+	_, err = c.History(context.Background(), "euribor-1y", Rango30M)
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 2 {
 		t.Fatalf("el rango abierto debe refrescar tras 24 h; peticiones = %d", got)
@@ -91,16 +101,16 @@ func TestCacheHistoricoAnioEnCurso(t *testing.T) {
 
 	r, err := RangoAnio(2026)
 	assertNoErr(t, err)
-	_, err = c.History("euribor-1y", r)
+	_, err = c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
-	_, err = c.History("euribor-1y", r)
+	_, err = c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 1 {
 		t.Fatalf("dentro de la TTL debe servirse de caché; peticiones = %d", got)
 	}
 
 	*now = now.Add(25 * time.Hour)
-	_, err = c.History("euribor-1y", r)
+	_, err = c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 	if got := ts.hits.Load(); got != 2 {
 		t.Fatalf("el año aún abierto debe refrescar tras 24 h; peticiones = %d", got)
@@ -108,7 +118,7 @@ func TestCacheHistoricoAnioEnCurso(t *testing.T) {
 }
 
 func TestCacheCorruptoSeIgnora(t *testing.T) {
-	ts, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
+	ts, c := newFixtureClient(t, cuerpoFavoritasUno(), 0)
 	cache, _ := newTestCache(t)
 	c.cache = cache
 	key := "D_1NBAF472"
@@ -117,7 +127,7 @@ func TestCacheCorruptoSeIgnora(t *testing.T) {
 	if err := os.WriteFile(cache.path("latest", key), []byte("no soy json"), 0o600); err != nil {
 		t.Fatalf("escribir caché corrupta: %v", err)
 	}
-	obs, err := c.Latest([]string{"euribor-1y"})
+	obs, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := obsByCode(t, obs, "D_1NBAF472").Value.String(); got != "3.247" {
 		t.Fatalf("la caché corrupta debe ignorarse y refetch: %q", got)
@@ -131,7 +141,7 @@ func TestCacheCorruptoSeIgnora(t *testing.T) {
 	if err := os.WriteFile(cache.path("latest", key), otro, 0o600); err != nil {
 		t.Fatalf("escribir caché extranjera: %v", err)
 	}
-	obs, err = c.Latest([]string{"euribor-1y"})
+	obs, err = c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := obsByCode(t, obs, "D_1NBAF472").Value.String(); got != "3.247" {
 		t.Fatalf("la caché de otro formato debe ignorarse: %q", got)
@@ -142,7 +152,7 @@ func TestCacheCorruptoSeIgnora(t *testing.T) {
 	if err := os.WriteFile(cache.path("latest", key), futura, 0o600); err != nil {
 		t.Fatalf("escribir caché futura: %v", err)
 	}
-	obs, err = c.Latest([]string{"euribor-1y"})
+	obs, err = c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := obsByCode(t, obs, "D_1NBAF472").Value.String(); got != "3.247" {
 		t.Fatalf("la caché de otra versión debe ignorarse, nunca servir 9.999: %q", got)
@@ -152,11 +162,11 @@ func TestCacheCorruptoSeIgnora(t *testing.T) {
 // TestCacheEscribeEntradaVersionada: la entrada escrita lleva su versión de
 // formato y el valor exacto como texto decimal.
 func TestCacheEscribeEntradaVersionada(t *testing.T) {
-	_, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
+	_, c := newFixtureClient(t, cuerpoFavoritasUno(), 0)
 	cache, _ := newTestCache(t)
 	c.cache = cache
 
-	_, err := c.Latest([]string{"euribor-1y"})
+	_, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	data, err := os.ReadFile(cache.path("latest", "D_1NBAF472"))
 	assertNoErr(t, err)
@@ -178,14 +188,14 @@ func TestCacheEscribeEntradaVersionada(t *testing.T) {
 // TestCacheDirectorioNoEscribible: la caché es descartable; un fallo de
 // escritura nunca rompe la petición (decisión 4).
 func TestCacheDirectorioNoEscribible(t *testing.T) {
-	ts, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
+	ts, c := newFixtureClient(t, cuerpoFavoritasUno(), 0)
 	bloqueo := filepath.Join(t.TempDir(), "archivo")
 	if err := os.WriteFile(bloqueo, []byte("x"), 0o600); err != nil {
 		t.Fatalf("preparar el bloqueo: %v", err)
 	}
 	c.cache = NewCache(bloqueo) // MkdirAll fallará: es un fichero, no un directorio
 
-	obs, err := c.Latest([]string{"euribor-1y"})
+	obs, err := c.Latest(context.Background(), []string{"euribor-1y"})
 	assertNoErr(t, err)
 	if got := obsByCode(t, obs, "D_1NBAF472").Value.String(); got != "3.247" {
 		t.Fatalf("un fallo de escritura de caché no debe afectar al resultado: %q", got)

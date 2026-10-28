@@ -2,6 +2,7 @@ package bde
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -81,11 +82,13 @@ func NewHTTPClientWithCache(catalog *Catalog, cache *Cache) *HTTPClient {
 // Latest devuelve el último valor publicado de cada id del catálogo, mediante
 // `favoritas?idioma=es&series=...`. El array de respuesta sigue el orden de los
 // códigos pedidos (docs/series.md §3.1) y las observaciones llegan en ese orden.
+// El contexto cancela la petición en vuelo: un Ctrl+C sube como cancelled
+// (docs/series.md §6.4), no como error de red.
 //
 // Si algún elemento del array trae errNum, se separan: las observaciones
 // correctas se devuelven junto a un único error del contrato que agrega las
 // series fallidas (docs/series.md §6). Con caché, un acierto no toca la red.
-func (c *HTTPClient) Latest(ids []string) ([]Observation, error) {
+func (c *HTTPClient) Latest(ctx context.Context, ids []string) ([]Observation, error) {
 	if len(ids) == 0 {
 		return nil, errs.New(errs.KindUsage,
 			"no se ha indicado ningún índice",
@@ -99,14 +102,14 @@ func (c *HTTPClient) Latest(ids []string) ([]Observation, error) {
 		}
 		codes = append(codes, idx.Code)
 	}
-	return c.LatestCodes(codes)
+	return c.LatestCodes(ctx, codes)
 }
 
 // LatestCodes es Latest para códigos de serie directos: lo usan las series
 // auxiliares del IRPH (docs/series.md §1.4) y los códigos que el usuario fuerza
 // en la configuración. Un errNum sobre un código que sale del catálogo es
 // api_changed/7; sobre uno que no, not_found/4 (decisión 5).
-func (c *HTTPClient) LatestCodes(codes []string) ([]Observation, error) {
+func (c *HTTPClient) LatestCodes(ctx context.Context, codes []string) ([]Observation, error) {
 	if len(codes) == 0 {
 		return nil, errs.New(errs.KindUsage,
 			"no se ha indicado ninguna serie",
@@ -118,11 +121,11 @@ func (c *HTTPClient) LatestCodes(codes []string) ([]Observation, error) {
 			return obs, nil
 		}
 	}
-	body, err := c.get(endpointFavoritas, url.Values{"series": {key}})
+	body, err := c.get(ctx, endpointFavoritas, url.Values{"series": {key}})
 	if err != nil {
 		return nil, err
 	}
-	obs, err := c.decodeFavoritas(body)
+	obs, err := c.decodeFavoritas(body, codes)
 	if err != nil {
 		// Las observaciones correctas del array pueden acompañar al error;
 		// la entrada fallida no se cachea.
@@ -135,8 +138,9 @@ func (c *HTTPClient) LatestCodes(codes []string) ([]Observation, error) {
 }
 
 // History devuelve el histórico mensual de un id en orden ascendente, mediante
-// `listaSeries?idioma=es&series=...&rango=...` (docs/series.md §2, §3.2).
-func (c *HTTPClient) History(id string, rango Rango) (Series, error) {
+// `listaSeries?idioma=es&series=...&rango=...` (docs/series.md §2, §3.2). El
+// contexto cancela la petición en vuelo, igual que Latest.
+func (c *HTTPClient) History(ctx context.Context, id string, rango Rango) (Series, error) {
 	idx, err := c.catalog.Lookup(id)
 	if err != nil {
 		return Series{}, err
@@ -153,7 +157,7 @@ func (c *HTTPClient) History(id string, rango Rango) (Series, error) {
 		}
 	}
 	params := url.Values{"series": {idx.Code}, "rango": {rango.value}}
-	body, err := c.get(endpointListaSeries, params)
+	body, err := c.get(ctx, endpointListaSeries, params)
 	if err != nil {
 		return Series{}, err
 	}
@@ -170,16 +174,19 @@ func (c *HTTPClient) History(id string, rango Rango) (Series, error) {
 // get hace la petición GET y devuelve el cuerpo. El error, si lo hay, ya lleva
 // el sobre del contrato (docs/series.md §6, arranque §6.4). `idioma=es` se
 // añade aquí: ninguna llamada puede olvidarlo (invariante por construcción).
-func (c *HTTPClient) get(endpoint string, params url.Values) ([]byte, error) {
+func (c *HTTPClient) get(ctx context.Context, endpoint string, params url.Values) ([]byte, error) {
 	params.Set("idioma", languageES)
 	u := strings.TrimRight(c.baseURL, "/") + "/" + endpoint + "?" + params.Encode()
-	req, err := http.NewRequest(http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, errs.New(errs.KindInternal, "petición inválida al construirse: "+err.Error(), "")
 	}
 	req.Header.Set("User-Agent", c.userAgent)
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doWithRetry(ctx, req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, cancelledError(ctx)
+		}
 		return nil, transportError(err)
 	}
 	defer resp.Body.Close()
@@ -199,6 +206,9 @@ func (c *HTTPClient) get(endpoint string, params url.Values) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, cancelledError(ctx)
+		}
 		return nil, transportError(err)
 	}
 	return body, nil
@@ -206,8 +216,10 @@ func (c *HTTPClient) get(endpoint string, params url.Values) ([]byte, error) {
 
 // doWithRetry ejecuta la petición con como máximo un reintento ante 5xx/429
 // (decisión 6): sin reintentos infinitos ni bucles. Los cortes de conexión y
-// los timeouts no se reintentan: suben tal cual a transportError.
-func (c *HTTPClient) doWithRetry(req *http.Request) (*http.Response, error) {
+// los timeouts no se reintentan: suben tal cual a transportError. La espera del
+// backoff es interrumpible: un contexto cancelado corta la espera en vez de
+// dormir el reintento completo.
+func (c *HTTPClient) doWithRetry(ctx context.Context, req *http.Request) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -217,7 +229,11 @@ func (c *HTTPClient) doWithRetry(req *http.Request) (*http.Response, error) {
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 	resp.Body.Close()
-	time.Sleep(c.retryWait)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(c.retryWait):
+	}
 	return c.httpClient.Do(req)
 }
 
@@ -233,6 +249,14 @@ func transportError(err error) error {
 	return errs.New(errs.KindNetwork,
 		"no se pudo contactar con la API del Banco de España: "+err.Error(),
 		"comprueba la conexión a internet")
+}
+
+// cancelledError construye el sobre cancelled/2 (arranque §6.4): un contexto
+// cancelado (Ctrl+C vía signal.NotifyContext) nunca es un error de red.
+func cancelledError(ctx context.Context) *errs.Error {
+	return errs.New(errs.KindCancelled,
+		"la petición al Banco de España se ha cancelado: "+ctx.Err().Error(),
+		"la operación se interrumpió antes de terminar")
 }
 
 // apiChangedf construye el error de contrato roto: código 7 con enlace a issue
@@ -323,12 +347,21 @@ type rawFavorita struct {
 // decodeFavoritas decodifica la respuesta de favoritas: array de elementos o
 // objeto de error. Devuelve las observaciones correctas aunque haya elementos
 // con errNum; en ese caso el error agrega las series fallidas.
-func (c *HTTPClient) decodeFavoritas(body []byte) ([]Observation, error) {
+func (c *HTTPClient) decodeFavoritas(body []byte, codes []string) ([]Observation, error) {
 	switch jsonKind(body) {
 	case '{':
 		apiErr, err := decodeAPIError(body)
 		if err != nil {
 			return nil, err
+		}
+		// Un objeto de error sobre un código que sale del catálogo es un
+		// contrato roto, no una serie que falta (decisión 5): el cliente pide
+		// códigos que el catálogo afirma que existen.
+		for _, code := range codes {
+			if c.catalog.hasCode(code) {
+				return nil, apiChangedf("la API devolvió errNum %d (%s) para la serie del catálogo %s",
+					apiErr.ErrNum, firstNonEmpty(apiErr.ErrMsgDebug, apiErr.ErrMsgUsr), code)
+			}
 		}
 		return nil, c.classifyAPIError(apiErr)
 	case '[':
@@ -336,15 +369,33 @@ func (c *HTTPClient) decodeFavoritas(body []byte) ([]Observation, error) {
 		if err := decodeJSON(body, &elems); err != nil {
 			return nil, apiChangedf("favoritas no es un array válido: %v", err)
 		}
-		return c.favoritasObservations(elems)
+		return c.favoritasObservations(elems, codes)
 	default:
 		return nil, apiChangedf("la respuesta no es JSON")
 	}
 }
 
-// favoritasObservations valida el array por elemento (docs/series.md §6): los
-// elementos con errNum se separan y se clasifican; los correctos se convierten.
-func (c *HTTPClient) favoritasObservations(elems []rawFavorita) ([]Observation, error) {
+// favoritasObservations valida el array contra los códigos pedidos y luego por
+// elemento (docs/series.md §3.1, §6): el array debe traer, en orden, un elemento
+// por código pedido. Un array vacío, corto, con un código duplicado o fuera de
+// orden es un contrato roto — no un éxito con datos que faltan que acabaría en
+// la caché. Los elementos con errNum se separan y se clasifican; los correctos
+// se convierten.
+func (c *HTTPClient) favoritasObservations(elems []rawFavorita, codes []string) ([]Observation, error) {
+	if len(elems) != len(codes) {
+		return nil, apiChangedf("favoritas devolvió %d elementos y se pedían %d series (%s)",
+			len(elems), len(codes), strings.Join(codes, ", "))
+	}
+	for i, e := range elems {
+		got := e.Serie
+		if e.ErrNum != nil {
+			got = e.Codigo
+		}
+		if got != codes[i] {
+			return nil, apiChangedf("favoritas devolvió la serie %s en la posición %d y se esperaba %s (el orden del array sigue el de los códigos pedidos)",
+				got, i, codes[i])
+		}
+	}
 	obs := make([]Observation, 0, len(elems))
 	type failure struct {
 		code string
@@ -473,11 +524,26 @@ func (c *HTTPClient) seriesFromLista(e rawListaSerie) (Series, error) {
 		return Series{}, apiChangedf("la serie %s trae una fechaFin inesperada: %q", e.Serie, e.FechaFin)
 	}
 	obs := make([]Observation, 0, len(e.Fechas))
-	for i := len(e.Fechas) - 1; i >= 0; i-- {
-		month, err := monthOf(e.Fechas[i])
+	// La API contesta descendente (docs/series.md §3.2) y el cliente invierte;
+	// si algún día contestara ascendente, invertirla entregaría (y cachearía)
+	// una serie descendente sin que nadie lo sepa. Se comprueba el orden antes
+	// de invertir: contrato roto → api_changed.
+	months := make([]time.Time, len(e.Fechas))
+	for i, f := range e.Fechas {
+		month, err := monthOf(f)
 		if err != nil {
-			return Series{}, apiChangedf("la serie %s trae una fecha inesperada: %q", e.Serie, e.Fechas[i])
+			return Series{}, apiChangedf("la serie %s trae una fecha inesperada: %q", e.Serie, f)
 		}
+		months[i] = month
+	}
+	for i := 1; i < len(months); i++ {
+		if months[i].After(months[i-1]) {
+			return Series{}, apiChangedf("la serie %s llega en orden ascendente (%s va antes que %s); el contrato es descendente",
+				e.Serie, months[i-1].Format("2006-01"), months[i].Format("2006-01"))
+		}
+	}
+	for i := len(e.Fechas) - 1; i >= 0; i-- {
+		month := months[i]
 		v, err := model.NewDecimal(e.Valores[i].String())
 		if err != nil {
 			return Series{}, apiChangedf("la serie %s trae un valor que no es un decimal válido: %q", e.Serie, e.Valores[i].String())
