@@ -44,15 +44,16 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// P-01: stdout carries a single JSON value per command. With no subcommand
-			// there is no result, so the help goes to stderr and the command fails
-			// with a usage error (exit code 2), leaving stdout empty.
-			cmd.SetOut(cmd.ErrOrStderr())
-			if err := cmd.Help(); err != nil {
-				return err
-			}
-			return errs.New(errs.KindUsage, "esperando un subcomando: ejecute \"hipoteca --help\" para ver los disponibles", "")
+			// there is no result, so the only output is the usage error that main turns
+			// into the JSON envelope on stderr (review finding 5): printing the help
+			// here would concatenate prose and JSON on stderr and break parsers. The
+			// hint tells the human where the help lives. Explicit help stays prose on
+			// stdout with exit 0 (decision 7, see output/doc.go).
+			return errs.New(errs.KindUsage,
+				"esperando un subcomando: no hay ningún resultado que mostrar",
+				"ejecute \"hipoteca --help\" para ver los subcomandos disponibles")
 		},
 	}
 

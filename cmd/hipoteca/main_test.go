@@ -237,3 +237,86 @@ func TestUnknownFlagEnvelopeOnStderrAndExit2(t *testing.T) {
 		t.Errorf("unexpected envelope: %+v", envelope)
 	}
 }
+
+// Review finding 3 (decision 7): explicit help is the documented exception to
+// "stdout carries JSON" — prose for a human, exit 0, empty stderr.
+func TestExplicitHelpIsProseOnStdoutWithExit0(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"help"}, {"version", "--help"}} {
+		name := strings.Join(args, " ")
+		t.Run(name, func(t *testing.T) {
+			stdout, stderr, code := run(t, args...)
+			if code != 0 {
+				t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr)
+			}
+			if len(stdout) == 0 {
+				t.Error("the help prose must go to stdout, got nothing")
+			}
+			if json.Valid(stdout) {
+				t.Errorf("the help must be prose, not a JSON value: %q", stdout)
+			}
+			if len(stderr) != 0 {
+				t.Errorf("stderr must stay empty, got %q", stderr)
+			}
+		})
+	}
+}
+
+// Review finding 4: `version extra` must be classified as usage (exit 2, type
+// "usage"), not fall through to internal (exit 1).
+func TestVersionExtraArgExits2WithUsageEnvelope(t *testing.T) {
+	stdout, stderr, code := run(t, "version", "extra")
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr: %s)", code, stderr)
+	}
+	if len(stdout) != 0 {
+		t.Errorf("stdout must stay empty on failure, got %q", stdout)
+	}
+	var envelope struct {
+		Error struct {
+			Type     string `json:"type"`
+			ExitCode int    `json:"exit_code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(stderr, &envelope); err != nil {
+		t.Fatalf("stderr is not a JSON envelope: %v (raw: %q)", err, stderr)
+	}
+	if envelope.Error.Type != "usage" || envelope.Error.ExitCode != 2 {
+		t.Errorf("unexpected envelope: %+v", envelope)
+	}
+}
+
+// Review finding 5: with no subcommand stderr carries exactly one parseable
+// JSON value — the envelope, with the hint to run `hipoteca --help` — and never
+// the whole help text concatenated before it. stdout stays empty.
+func TestBareInvocationWritesSingleJSONEnvelopeOnStderr(t *testing.T) {
+	stdout, stderr, code := run(t)
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr: %s)", code, stderr)
+	}
+	if len(stdout) != 0 {
+		t.Errorf("stdout must stay empty on failure, got %q", stdout)
+	}
+	dec := json.NewDecoder(bytes.NewReader(stderr))
+	var envelope struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+			Hint    string `json:"hint"`
+		} `json:"error"`
+	}
+	if err := dec.Decode(&envelope); err != nil {
+		t.Fatalf("stderr is not a JSON envelope: %v (raw: %q)", err, stderr)
+	}
+	if dec.More() {
+		t.Errorf("stderr must carry exactly one JSON value, got %q", stderr)
+	}
+	if envelope.Error.Type != "usage" {
+		t.Errorf("type = %q, want usage", envelope.Error.Type)
+	}
+	if !strings.Contains(envelope.Error.Hint, "--help") {
+		t.Errorf("the hint must point at \"hipoteca --help\", got %q", envelope.Error.Hint)
+	}
+	if strings.Contains(string(stderr), "Usage:") || strings.Contains(string(stderr), "hipoteca lee los tipos") {
+		t.Errorf("the help prose must never reach stderr with the envelope, got %q", stderr)
+	}
+}
