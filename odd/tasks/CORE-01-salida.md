@@ -37,9 +37,12 @@ cumplir P-05 en cada salida sin repetir el texto en veinte sitios.
    cuando sí lo es (arranque §6.1). Un agente siempre recibe JSON.
 2. **Un solo valor JSON y un `\n` final.** Nada de logs ni avisos en stdout: el diagnóstico
    va a stderr. `--pretty` produce texto legible es-ES, no JSON.
-3. **Los decimales viajan como cadena.** `decimal.Decimal` se serializa con su
-   representación decimal exacta, sin notación científica y sin perder ceros significativos
-   cuando el valor los tenga. Nunca como número JSON.
+3. **Los decimales viajan como cadena.** Se serializan con su representación decimal
+   exacta, sin notación científica y sin perder ceros significativos cuando el valor los
+   tenga. Nunca como número JSON. La exactitud la garantiza `model.Decimal` (envoltorio
+   de `decimal.Decimal` cuyo `MarshalJSON` conserva la escala); `WriteJSON` serializa lo
+   que recibe, sin reescritura reflexiva de tipos, y los structs de salida usan
+   `model.Decimal`, nunca `decimal.Decimal` directamente (un test AST lo vigila).
 4. **Tabla de tipos, fuente única.** `errs` es el único lugar donde vive el mapeo a códigos:
 
    | Código | Tipos |
@@ -59,6 +62,12 @@ cumplir P-05 en cada salida sin repetir el texto en veinte sitios.
    El texto se construye en `internal/model`, no en cada comando.
 6. **`hint` es opcional en el JSON**, `message` y `type` nunca. El mensaje va en español
    (es texto para el usuario; el código y los identificadores siguen en inglés).
+7. **La ayuda explícita es prosa en stdout, con salida 0.** La salida de *resultados* es
+   JSON (P-01), pero `hipoteca --help`, `hipoteca help` y `hipoteca version --help`
+   escriben prosa en stdout y terminan en 0: quien pide ayuda es una persona con un
+   paginador, y ese texto no se pensó para parsearse. Es la única excepción documentada
+   a «stdout lleva un valor JSON» (ver `output/doc.go`). Sin subcomando, en cambio, sólo
+   sale el sobre en stderr —con la pista `hipoteca --help`—, nunca el texto de ayuda.
 
 ## Superficie de edición (nuestra)
 
@@ -88,18 +97,50 @@ verificador independiente y los tests e2e no dependen de ningún comando de nego
 
 ## Evidencia de verificación
 
-Se completa al cerrar.
+- **Verificador independiente: FAIL en la primera pasada.** Un blocker (decimal tras una
+  interface no vacía se recortaba en silencio), dos panics de la reescritura reflexiva y dos
+  agujeros de contrato (`--help` en stdout no documentado, `version extra-arg` con código 1).
+- **Cambio de diseño**: se eliminó la reescritura reflexiva (382 → 26 líneas) y la
+  exactitud decimal pasó a `model.Decimal` con guarda de AST.
+- **Verificación del autor con los ocho probes del verificador**: `version` un JSON;
+  `--help`/`help`/`version --help` prosa en stdout con exit 0 (excepción documentada);
+  `inventado`, `version --bogus` y `version extra` con stdout **vacío** y sobre `usage`/2;
+  invocación desnuda con stdout vacío y **un único** JSON parseable en stderr.
+- `ctx cancelado → 130` sin sobre, cubierto por test unitario.
+- `bash scripts/check.sh` → exit 0.
 
 ## Progreso
 
-Contrato fijado; implementación no iniciada.
+**Cerrada.** Detalle completo del FAIL y de la corrección en `odd/reviews/CORE-01.md`.
 
 ## Siguiente paso
 
-Test en rojo, implementación, verificación.
+`CORE-02` (config XDG, escrituras atómicas) y, con ella, `BDE-01` (cliente HTTP con caché).
+Al añadir structs de salida en esos paquetes, extender la guarda de AST de `model.Decimal`.
 
 ## Log
 
 ### L1 · 2026-10-28 · decisión del usuario
 
 Tras cerrar FIN-01, el usuario elige continuar por CORE-01.
+
+### L2 · 2026-10-28 · ronda de corrección de la revisión independiente
+
+El verificador falla la implementación con tres defectos del reescritor reflexivo de
+`output.go` (recorte silencioso tras una interfaz no vacía, pánico en campos interfaz
+tras reconstruir, pánico en punteros nil) y cinco hallazgos más del contrato CLI. Se
+elimina el reescritor (382 → 24 líneas en `output.go`): `WriteJSON` queda como codificador
+fino sin reflexión y la exactitud pasa a vivir en `model.Decimal`, nuevo envoltorio de
+`decimal.Decimal` cuyo `MarshalJSON` conserva la escala, con test AST que impide campos
+`decimal.Decimal` en `internal/model`. Se corrigen además: `version extra` → usage/2, el
+sobre único sin ayuda concatenada ante invocación desnuda, `version` vía `output.WriteJSON`,
+y las dos atribuciones que rechazan una `data_updated_at` vacía o no parseable. La ayuda
+explícita queda documentada como excepción (decisión 7).
+
+### L2 · 2026-10-28 · ronda de corrección
+
+El verificador devolvió FAIL con un blocker real (decimal tras interface recortado en
+silencio) y dos panics de la reescritura reflexiva. Se decidió **eliminar la reflexión** en
+vez de parchearla: tres defectos en la misma maquinaria son señal de enfoque, no de caso
+faltante. La exactitud decimal vive ahora en `model.Decimal` y en una guarda de AST. Se añade
+la decisión 7: la ayuda explícita es la única excepción al contrato de stdout.
