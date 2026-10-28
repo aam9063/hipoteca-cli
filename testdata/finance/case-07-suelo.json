@@ -1,0 +1,78 @@
+{
+  "id": "case-07-suelo",
+  "description": "Revisión con suelo: índice 1.500 + diferencial 0.890 = 2.390, el suelo de 3.000 muerde y se aplica antes del redondeo de escritura.",
+  "inputs": {
+    "principal": "150000.00",
+    "term_months": 240,
+    "initial_rate": "3.500",
+    "initial_period_months": 12,
+    "revision_every_months": 12,
+    "index_values": [
+      "1.500"
+    ],
+    "index_values_status": "assumed-hypothetical",
+    "spread": "0.890",
+    "floor_rate": "3.000",
+    "rate_rounding": "none",
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents"
+  },
+  "expected": {
+    "payment": "869.94",
+    "total_interest": "50486.52",
+    "total_paid": "200486.52",
+    "first_row": {
+      "month": 1,
+      "payment": "869.94",
+      "interest": "437.50",
+      "principal_repaid": "432.44",
+      "outstanding_after": "149567.56"
+    },
+    "last_row": {
+      "month": 240,
+      "payment": "833.66",
+      "interest": "2.08",
+      "principal_repaid": "831.58",
+      "outstanding_after": "0.00"
+    },
+    "sum_principal_repaid": "150000.00",
+    "final_outstanding": "0.00",
+    "initial_payment": "869.94",
+    "revisions": [
+      {
+        "revision_number": 1,
+        "first_month": 13,
+        "index_value": "1.500",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "2.390",
+        "tin_after_floor": "3.000",
+        "tin_after_rounding": "3.000",
+        "remaining_months": 228,
+        "payment": "833.54"
+      }
+    ],
+    "first_row_after_first_revision": {
+      "month": 13,
+      "payment": "833.54",
+      "interest": "361.82",
+      "principal_repaid": "471.72",
+      "outstanding_after": "144254.95"
+    }
+  },
+  "source": {
+    "generator": "testdata/finance/generate.py",
+    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generated_at": "2026-10-28",
+    "python_version": "3.14.5",
+    "numpy_version": "2.5.4",
+    "numpy_financial_version": "1.1.0",
+    "methods": [
+      "simulación exacta con decimal.Decimal (precisión 50) y redondeo ROUND_HALF_UP a céntimos",
+      "contraste de la cuota de cada tramo con numpy_financial.pmt"
+    ],
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents",
+    "crosscheck_tolerance": "0.01"
+  }
+}

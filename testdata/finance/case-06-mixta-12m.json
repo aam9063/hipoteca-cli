@@ -1,0 +1,169 @@
+{
+  "id": "case-06-mixta-12m",
+  "description": "Mixta: 12 meses al 1.25 % y luego revisiones anuales. Los valores de índice son hipotéticos y fijos (no son datos del Banco de España): fijan el recálculo de la cuota en cada tramo.",
+  "inputs": {
+    "principal": "150000.00",
+    "term_months": 240,
+    "initial_rate": "1.25",
+    "initial_period_months": 12,
+    "revision_every_months": 12,
+    "index_values": [
+      "1.500",
+      "2.000",
+      "2.500",
+      "3.000",
+      "2.750",
+      "2.250",
+      "1.750",
+      "1.250"
+    ],
+    "index_values_status": "assumed-hypothetical",
+    "spread": "0.890",
+    "floor_rate": null,
+    "rate_rounding": "none",
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents"
+  },
+  "expected": {
+    "payment": "706.70",
+    "total_interest": "42214.52",
+    "total_paid": "192214.52",
+    "first_row": {
+      "month": 1,
+      "payment": "706.70",
+      "interest": "156.25",
+      "principal_repaid": "550.45",
+      "outstanding_after": "149449.55"
+    },
+    "last_row": {
+      "month": 240,
+      "payment": "788.73",
+      "interest": "1.40",
+      "principal_repaid": "787.33",
+      "outstanding_after": "0.00"
+    },
+    "sum_principal_repaid": "150000.00",
+    "final_outstanding": "0.00",
+    "initial_payment": "706.70",
+    "revisions": [
+      {
+        "revision_number": 1,
+        "first_month": 13,
+        "index_value": "1.500",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "2.390",
+        "tin_after_floor": "2.390",
+        "tin_after_rounding": "2.390",
+        "remaining_months": 228,
+        "payment": "782.90"
+      },
+      {
+        "revision_number": 2,
+        "first_month": 25,
+        "index_value": "2.000",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "2.890",
+        "tin_after_floor": "2.890",
+        "tin_after_rounding": "2.890",
+        "remaining_months": 216,
+        "payment": "816.13"
+      },
+      {
+        "revision_number": 3,
+        "first_month": 37,
+        "index_value": "2.500",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "3.390",
+        "tin_after_floor": "3.390",
+        "tin_after_rounding": "3.390",
+        "remaining_months": 204,
+        "payment": "848.46"
+      },
+      {
+        "revision_number": 4,
+        "first_month": 49,
+        "index_value": "3.000",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "3.890",
+        "tin_after_floor": "3.890",
+        "tin_after_rounding": "3.890",
+        "remaining_months": 192,
+        "payment": "879.78"
+      },
+      {
+        "revision_number": 5,
+        "first_month": 61,
+        "index_value": "2.750",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "3.640",
+        "tin_after_floor": "3.640",
+        "tin_after_rounding": "3.640",
+        "remaining_months": 180,
+        "payment": "864.90"
+      },
+      {
+        "revision_number": 6,
+        "first_month": 73,
+        "index_value": "2.250",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "3.140",
+        "tin_after_floor": "3.140",
+        "tin_after_rounding": "3.140",
+        "remaining_months": 168,
+        "payment": "837.36"
+      },
+      {
+        "revision_number": 7,
+        "first_month": 85,
+        "index_value": "1.750",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "2.640",
+        "tin_after_floor": "2.640",
+        "tin_after_rounding": "2.640",
+        "remaining_months": 156,
+        "payment": "812.12"
+      },
+      {
+        "revision_number": 8,
+        "first_month": 97,
+        "index_value": "1.250",
+        "index_value_status": "assumed-hypothetical",
+        "spread": "0.890",
+        "tin_raw": "2.140",
+        "tin_after_floor": "2.140",
+        "tin_after_rounding": "2.140",
+        "remaining_months": 144,
+        "payment": "789.13"
+      }
+    ],
+    "first_row_after_first_revision": {
+      "month": 13,
+      "payment": "782.90",
+      "interest": "285.52",
+      "principal_repaid": "497.38",
+      "outstanding_after": "142859.25"
+    }
+  },
+  "source": {
+    "generator": "testdata/finance/generate.py",
+    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generated_at": "2026-10-28",
+    "python_version": "3.14.5",
+    "numpy_version": "2.5.4",
+    "numpy_financial_version": "1.1.0",
+    "methods": [
+      "simulación exacta con decimal.Decimal (precisión 50) y redondeo ROUND_HALF_UP a céntimos",
+      "contraste de la cuota de cada tramo con numpy_financial.pmt"
+    ],
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents",
+    "crosscheck_tolerance": "0.01"
+  }
+}
