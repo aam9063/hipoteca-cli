@@ -98,34 +98,58 @@ esta tarea lleva **verificador independiente** además del review gate.
 
 ## Checklist
 
-- [ ] FIN-01.1 Test en rojo contra los casos 1-5 de `testdata/finance/` · Criterio: el test
+- [x] FIN-01.1 Test en rojo contra los casos 1-5 de `testdata/finance/` · Criterio: el test
       lee los JSON (no números escritos a mano en el test) y falla antes de la
-      implementación.
-- [ ] FIN-01.2 `Payment` con `big.Rat` y redondeo half-up · Criterio: reproduce las cuotas
+      implementación. **Rojo observado**: build sin las funciones.
+- [x] FIN-01.2 `Payment` con `big.Rat` y redondeo half-up · Criterio: reproduce las cuotas
       de los casos 1 y 5 y el caso 2 (`i = 0`) sin división por cero.
-- [ ] FIN-01.3 `Amortization` con interés mensual redondeado y última cuota que absorbe el
+- [x] FIN-01.3 `Amortization` con interés mensual redondeado y última cuota que absorbe el
       residuo · Criterio: capital final exactamente `0.00` en los cinco casos fijos.
-- [ ] FIN-01.4 Propiedades · Criterio: la suma de amortizaciones iguala el principal; el
+- [x] FIN-01.4 Propiedades · Criterio: la suma de amortizaciones iguala el principal; el
       capital nunca es negativo ni crece; `TotalPaid == TotalInterest + Principal`.
-- [ ] FIN-01.5 Validación de entradas · Criterio: principal negativo, meses ≤ 0 y tipo
+      **La invariante del capital fue falsa en un principio**: ver el hallazgo del
+      verificador y la corrección de cierre anticipado.
+- [x] FIN-01.5 Validación de entradas · Criterio: principal negativo, meses ≤ 0 y tipo
       negativo devuelven el error centinela correspondiente.
-- [ ] FIN-01.6 Verificación de que no hay `float64` en el paquete · Criterio: test de AST
+- [x] FIN-01.6 Verificación de que no hay `float64` en el paquete · Criterio: test de AST
       que falla si aparece un `float64` o un `float32` (adelanto mínimo de OPS-02, sólo
-      como test, sin linter).
-- [ ] FIN-01.7 Review gate con verificador independiente · Criterio: informe en
-      `odd/reviews/FIN-01.md` con el veredicto del verificador.
+      como test, sin linter). Límite real documentado: no ve floats escondidos tras otras
+      APIs, `interface{}` ni `unsafe`.
+- [x] FIN-01.7 Review gate con verificador independiente · Criterio: informe en
+      `odd/reviews/FIN-01.md` con el veredicto del verificador. Verificador escalado por el
+      ítem de riesgo 6 y aceptado por el plan (`independentVerifier: true`).
 
 ## Evidencia de verificación
 
-Se completa al cerrar.
+- **Rojo antes de implementar**: `go test ./internal/finance/` falla con
+  `undefined: Payment / Amortization / Loan / Row` (no existía el paquete).
+- **Verde**: los cinco casos de referencia, el caso de tipo 0 %, las propiedades, la
+  validación de entradas y la guarda anti-float.
+- **Contraste fuera de los fixtures** (para descartar sobreajuste): 250000.00 al 4.15 % a
+  372 meses contra una implementación independiente → cuota 1195.58, interés total
+  194754.99, primera fila 864.58 / 331.00 / 249669.00, última cuota 1194.81, cierre 0.00.
+  Idénticos.
+- **Verificador independiente** (contexto limpio, sólo lectura, escalado por ítem de riesgo
+  6): PASS WITH FIXES. Halló que la cuota redondeada podía liquidar el préstamo antes del
+  último mes y emitir filas con saldo y pago negativos (150000.00 al 23.62 % a 480 meses:
+  pago de −270.20). Corregido con cierre anticipado; re-verificado por el autor con
+  implementación independiente: 479 filas, última cuota 2687.77, interés total 1264107.05,
+  cierre 0.00.
+- **Rejilla de propiedades**: 245 combinaciones (5 capitales × 7 tipos de 0.01 % a 25 % ×
+  7 plazos de 1 a 480 meses); falla en la combinación exacta del hallazgo.
+- `bash scripts/check.sh` → exit 0. CI del PR #6, run `40721021576`: `check` en ubuntu,
+  macos y windows más `review gate report`, los cuatro en success.
+- El residual queda probado como load-bearing: al quitarlo fallan los casos 1, 3, 4 y 5.
 
 ## Progreso
 
-Documento y API fijados; implementación no iniciada.
+**Cerrada.** PR #6 mergeado a `dev`.
 
 ## Siguiente paso
 
-Rama, test en rojo, implementación.
+Ola 1: `CORE-01` (sobre de error, códigos de salida y `schema`), `CORE-02` (config XDG) y,
+tras CORE-02, `BDE-01` (cliente de la API con caché y `series.yaml`). `FIN-02` (revisión,
+suelo, redondeo, mixta) ya puede construirse sobre `Payment`/`Amortization`.
 
 ## Log
 
@@ -140,3 +164,11 @@ arrancar FIN-01 con esos casos.
 D-03 resuelta: `big.Rat` en el núcleo por exactitud, `shopspring/decimal` en la API pública
 por legibilidad. Se descarta `decimal` en el núcleo porque su precisión de división es una
 variable global mutable.
+
+### L3 · 2026-10-28 · cierre
+
+PR #6, CI run `40721021576` en verde (los tres `check` y el review gate). El verificador
+independiente encontró un defecto real que ni los casos de referencia ni el contraste del
+autor detectaron, y su corrección añadió la rejilla de propiedades que lo habría cazado.
+Los hashes en `dev` se consultan con `git log`; el registro cita el PR y el run porque el
+merge con rebase los reescribe.
