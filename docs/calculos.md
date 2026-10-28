@@ -53,6 +53,16 @@ cuotas. Por diseño, el capital final del cuadro es exactamente `0.00`: la toler
 explícita de `±0.01` existe **solo** para comparar con terceros (otros simuladores, el
 banco), nunca para justificar un residuo en nuestra propia simulación.
 
+**Consecuencia en tipos extremos: el plazo puede acortarse.** Redondear half-up puede
+dejar la cuota hasta medio céntimo por encima de la cuota exacta. Con combinaciones
+extremas de tipo y plazo (tipos de dos dígitos a cientos de meses, inalcanzables en una
+hipoteca española), ese excedente acumulado liquida el préstamo antes del mes `n`.
+Cuando la cuota redondeada superaría capital pendiente + interés, esa mensualidad pasa a
+ser la última: paga exactamente capital + interés, el capital queda en `0.00` y el cuadro
+termina antes de `n` filas (p. ej. 150000.00 al 23.62 % a 480 meses cierra en el mes 479,
+con cuota final 2687.77). El préstamo se cierra siempre exactamente: el cuadro simplemente
+acaba unas filas antes. En tipos de hipoteca (≤ 7 %) el cuadro tiene siempre `n` filas.
+
 ### 1.4 Interés del mes
 
 ```
