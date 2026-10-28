@@ -9,10 +9,16 @@ casos fijan están en `docs/calculos.md`; léelo antes de tocar nada de aquí.
 - `case-01` a `case-05`: préstamos de tipo fijo (caso base, tipo 0 %, tipo bajo, plazo
   corto, importes "feos").
 - `case-06` a `case-08`: revisión (mixta con revisiones anuales, suelo, redondeo de
-  escritura 1/8). Los valores de índice son **hipotéticos y fijos**, no datos del Banco
-  de España; cada JSON lo marca (`index_values_status: "assumed-hypothetical"`).
+  escritura 1/8). Los valores de índice son **reales y publicados** del Euríbor a 1 año
+  (Banco de España, serie `D_1NBAF472`, meses de noviembre de 2019 a 2025); cada JSON lo
+  marca (`index_values_status: "published"`, con mes, valor y serie por entrada).
 - `case-09` y `case-10`: amortización anticipada en los dos modos
   (`reduce-payment` y `reduce-term`), comisión 0 %.
+
+La procedencia del índice de los casos 6 a 8 se comprueba contra
+`testdata/bde/listaSeries-euribor-1y-MAX.json`: el generador verifica cada mes y cada
+valor contra esa captura del Banco de España antes de calcular nada, y aborta sin
+escribir ningún archivo si algo no coincide.
 
 Cada JSON lleva `inputs` (todo lo necesario para recalcular a mano), `expected` (cuota,
 totales, primera y última fila del cuadro, suma de amortizaciones y capital final) y

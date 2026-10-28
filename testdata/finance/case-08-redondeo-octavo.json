@@ -1,16 +1,68 @@
 {
   "id": "case-08-redondeo-octavo",
-  "description": "Redondeo de escritura 1/8: índice 2.211 + diferencial 0.890 = 3.101 → múltiplo de 0.125 más próximo, half-up → 3.125.",
+  "description": "Redondeo de escritura 1/8 en cada revisión (7 de 7 cambian el TIN por redondeo: 0.618→0.625, 0.409→0.375, 0.403→0.375, 3.718→3.750, 4.912→4.875, 3.396→3.375, 3.107→3.125). Índices reales del Euríbor a 1 año (noviembre 2019-2025, Banco de España, serie D_1NBAF472).",
   "inputs": {
     "principal": "150000.00",
-    "term_months": 240,
-    "initial_rate": "3.101",
+    "term_months": 96,
+    "loan_start": "2019-01-01",
+    "payment_day": 1,
+    "initial_rate": "3.100",
     "initial_period_months": 12,
     "revision_every_months": 12,
+    "reference_offset_months": 2,
     "index_values": [
-      "2.211"
+      {
+        "revision": 1,
+        "reference_month": "2019-11",
+        "value": "-0.272",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 2,
+        "reference_month": "2020-11",
+        "value": "-0.481",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 3,
+        "reference_month": "2021-11",
+        "value": "-0.487",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 4,
+        "reference_month": "2022-11",
+        "value": "2.828",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 5,
+        "reference_month": "2023-11",
+        "value": "4.022",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 6,
+        "reference_month": "2024-11",
+        "value": "2.506",
+        "status": "published",
+        "series": "D_1NBAF472"
+      },
+      {
+        "revision": 7,
+        "reference_month": "2025-11",
+        "value": "2.217",
+        "status": "published",
+        "series": "D_1NBAF472"
+      }
     ],
-    "index_values_status": "assumed-hypothetical",
+    "index_values_status": "published",
+    "index_source": "Banco de España, serie D_1NBAF472 (Euríbor a 1 año), captura testdata/bde/",
     "spread": "0.890",
     "floor_rate": null,
     "rate_rounding": "1/8",
@@ -18,61 +70,154 @@
     "payment_rounding": "half-up-cents"
   },
   "expected": {
-    "payment": "839.50",
-    "total_interest": "51875.54",
-    "total_paid": "201875.54",
+    "payment": "1766.26",
+    "total_interest": "12315.87",
+    "total_paid": "162315.87",
     "first_row": {
       "month": 1,
-      "payment": "839.50",
-      "interest": "387.63",
-      "principal_repaid": "451.87",
-      "outstanding_after": "149548.13"
+      "payment": "1766.26",
+      "interest": "387.50",
+      "principal_repaid": "1378.76",
+      "outstanding_after": "148621.24"
     },
     "last_row": {
-      "month": 240,
-      "payment": "842.33",
-      "interest": "2.19",
-      "principal_repaid": "840.14",
+      "month": 96,
+      "payment": "1722.45",
+      "interest": "4.47",
+      "principal_repaid": "1717.98",
       "outstanding_after": "0.00"
     },
     "sum_principal_repaid": "150000.00",
     "final_outstanding": "0.00",
-    "initial_payment": "839.50",
+    "initial_payment": "1766.26",
     "revisions": [
       {
         "revision_number": 1,
         "first_month": 13,
-        "index_value": "2.211",
-        "index_value_status": "assumed-hypothetical",
+        "reference_month": "2019-11",
+        "index_value": "-0.272",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
         "spread": "0.890",
-        "tin_raw": "3.101",
-        "tin_after_floor": "3.101",
+        "tin_raw": "0.618",
+        "tin_after_floor": "0.618",
+        "tin_after_rounding": "0.625",
+        "remaining_months": 84,
+        "payment": "1621.28"
+      },
+      {
+        "revision_number": 2,
+        "first_month": 25,
+        "reference_month": "2020-11",
+        "index_value": "-0.481",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "0.409",
+        "tin_after_floor": "0.409",
+        "tin_after_rounding": "0.375",
+        "remaining_months": 72,
+        "payment": "1609.07"
+      },
+      {
+        "revision_number": 3,
+        "first_month": 37,
+        "reference_month": "2021-11",
+        "index_value": "-0.487",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "0.403",
+        "tin_after_floor": "0.403",
+        "tin_after_rounding": "0.375",
+        "remaining_months": 60,
+        "payment": "1609.07"
+      },
+      {
+        "revision_number": 4,
+        "first_month": 49,
+        "reference_month": "2022-11",
+        "index_value": "2.828",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "3.718",
+        "tin_after_floor": "3.718",
+        "tin_after_rounding": "3.750",
+        "remaining_months": 48,
+        "payment": "1722.05"
+      },
+      {
+        "revision_number": 5,
+        "first_month": 61,
+        "reference_month": "2023-11",
+        "index_value": "4.022",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "4.912",
+        "tin_after_floor": "4.912",
+        "tin_after_rounding": "4.875",
+        "remaining_months": 36,
+        "payment": "1751.44"
+      },
+      {
+        "revision_number": 6,
+        "first_month": 73,
+        "reference_month": "2024-11",
+        "index_value": "2.506",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "3.396",
+        "tin_after_floor": "3.396",
+        "tin_after_rounding": "3.375",
+        "remaining_months": 24,
+        "payment": "1724.73"
+      },
+      {
+        "revision_number": 7,
+        "first_month": 85,
+        "reference_month": "2025-11",
+        "index_value": "2.217",
+        "index_value_status": "published",
+        "index_series": "D_1NBAF472",
+        "spread": "0.890",
+        "tin_raw": "3.107",
+        "tin_after_floor": "3.107",
         "tin_after_rounding": "3.125",
-        "remaining_months": 228,
-        "payment": "841.23"
+        "remaining_months": 12,
+        "payment": "1722.42"
       }
     ],
     "first_row_after_first_revision": {
       "month": 13,
-      "payment": "841.23",
-      "interest": "376.30",
-      "principal_repaid": "464.93",
-      "outstanding_after": "144034.85"
+      "payment": "1621.28",
+      "interest": "69.38",
+      "principal_repaid": "1551.90",
+      "outstanding_after": "131665.88"
     }
   },
   "source": {
     "generator": "testdata/finance/generate.py",
-    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generator_sha256": "66de1b3179e2163adcb47e88f91ff9a20bdc06826a83d4afcd54c32e207c6056",
     "generated_at": "2026-10-28",
     "python_version": "3.14.5",
     "numpy_version": "2.5.4",
     "numpy_financial_version": "1.1.0",
     "methods": [
       "simulación exacta con decimal.Decimal (precisión 50) y redondeo ROUND_HALF_UP a céntimos",
-      "contraste de la cuota de cada tramo con numpy_financial.pmt"
+      "contraste de la cuota de cada tramo con numpy_financial.pmt",
+      "verificación de cada mes y valor de índice contra la captura del Banco de España testdata/bde/listaSeries-euribor-1y-MAX.json (serie D_1NBAF472)"
     ],
     "interest_convention": "monthly-nominal",
     "payment_rounding": "half-up-cents",
-    "crosscheck_tolerance": "0.01"
+    "crosscheck_tolerance": "0.01",
+    "index_fixture": {
+      "path": "testdata/bde/listaSeries-euribor-1y-MAX.json",
+      "series": "D_1NBAF472",
+      "sha256": "a8dfd6f538d9e35dac27a8f66c9cac1389ed5d7d3b2ccd4ba2b6205dc54362b5",
+      "captured_at": "2026-10-28"
+    }
   }
 }

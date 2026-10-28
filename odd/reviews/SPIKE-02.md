@@ -12,8 +12,51 @@
   comparó contra los fixtures. No corrió review nativo (`nativeRisk: unassessable`,
   `package-local-binary-missing`) ni verificador independiente (sin ítem de alto riesgo
   nombrado).
-- **Cierre pendiente:** la aprobación del usuario sobre la tabla de casos (SPIKE-02.5) es un
-  criterio de aceptación de la tarea, no una formalidad.
+- **Decisión del usuario (2026-10-28):** aprobadas las convenciones, incluida la 1 (tipo
+  mensual nominal) y la 4 (interés redondeado antes de amortizar); pedido explícito de
+  regenerar los casos 6-8 con **índices reales ya publicados**; autorizado arrancar FIN-01
+  con estos casos.
+
+## Segunda ronda: casos 6-8 con datos reales
+
+Los tres casos de revisión ya no usan índices hipotéticos. Mismo préstamo para los tres:
+`150000.00`, 96 meses desde 2019-01, tramo inicial de 12 meses y revisiones anuales con
+`reference_offset_months: 2`, es decir **siete revisiones** cuyo mes de referencia es el
+noviembre del año anterior. Los siete valores son reales y ya publicados:
+
+| Mes de referencia | Euríbor 1 año |
+|---|---|
+| 2019-11 | -0.272 |
+| 2020-11 | -0.481 |
+| 2021-11 | -0.487 |
+| 2022-11 | 2.828 |
+| 2023-11 | 4.022 |
+| 2024-11 | 2.506 |
+| 2025-11 | 2.217 |
+
+Cada JSON lleva la procedencia (`{revision, reference_month, value, status: "published",
+series}`) y un bloque `index_fixture` con la ruta, la serie y el `sha256` de la captura del
+Banco (`a8dfd6f5…54362b5`). **El generador verifica cada valor contra el fixture y aborta
+si no coincide**, así que la trazabilidad no es una promesa: es un paso del programa.
+
+Verificación con la tercera implementación (la misma independiente de la primera ronda),
+recalculada para 96 meses y siete tramos:
+
+| Caso | Cuotas de revisión | Interés total mío | Fixture | Cierre |
+|---|---|---|---|---|
+| 6 mixta | las 7 coinciden | 9660.61 | 9660.61 | 0.00 |
+| 7 suelo | las 7 coinciden | 20702.07 | 20702.07 | 0.00 |
+| 8 redondeo 1/8 | las 7 coinciden | 12315.87 | 12315.87 | 0.00 |
+
+Cuotas iniciales: 1642.74 / 1793.71 / 1766.26, idénticas. El suelo muerde en 4 de las 7
+revisiones del caso 7 (0.228, 0.019, 0.013 y 2.717 → 3.000) y no en 3.328, 4.522 y 3.006;
+las 7 revisiones del caso 8 cambian de tipo por el redondeo a 1/8. Determinismo confirmado:
+`sha256` agregado de los diez JSON idéntico antes y después de re-ejecutar
+(`3f9c78d4…dfd1847`).
+
+Los casos 1-5, 9 y 10 cambiaron **una sola línea** cada uno: el `generator_sha256` embebido,
+consecuencia mecánica de editar el generador. Dejar el hash viejo habría falsificado la
+procedencia.
 
 ## Verificación ejecutada
 
@@ -92,8 +135,9 @@ No se encontraron defectos de cálculo. Los dos "nit" no afectan a ningún núme
 
 ## Veredicto
 
-**PASS CON FIXES MENORES** → en la práctica: **aprobable**, sujeto a la revisión del
-usuario (SPIKE-02.5), que es criterio de aceptación de la tarea.
+**PASS.** Las convenciones fueron aprobadas por el usuario, los casos 6-8 se regeneraron
+con índices reales y verificados contra el fixture del Banco, y la tercera implementación
+coincide en los diez casos: cinco campo por campo y cinco por puntos de control y tramos.
 
 Lo que este gate **no** puede afirmar: que los casos coincidan con lo que cobra un banco
 real. Eso es H-03 y sigue abierto. Dos implementaciones independientes que coinciden
@@ -102,8 +146,5 @@ convenciones sean las de todas las escrituras.
 
 ## Pendiente para el usuario
 
-1. Aprobar la tabla de los diez casos (`docs/calculos.md` §3) antes del merge.
-2. Decidir si los índices hipotéticos de los casos 6-8 (marcados
-   `index_values_status: assumed-hypothetical`) sirven así o se prefieren valores reales
-   ya publicados.
-3. H-03 sigue abierto: los recibos reales confirmarán o reemplazarán estos casos.
+1. H-03 sigue abierto: los recibos reales confirmarán o reemplazarán estos casos. Es la
+   única prueba que puede detectar que una convención de la escritura no es la nuestra.
