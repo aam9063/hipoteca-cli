@@ -2,8 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/aam9063/hipoteca-cli/internal/errs"
 )
 
 // P-01: with no subcommand there is no JSON result to print, so stdout must stay
@@ -23,6 +26,56 @@ func TestRootWithoutSubcommandKeepsStdoutEmpty(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "Usage:") && !strings.Contains(stderr.String(), "hipoteca lee los tipos") {
 		t.Errorf("the help must go to stderr, got %q", stderr.String())
+	}
+}
+
+// An unknown command is a usage error of the contract (§6.4): it must reach main
+// as an errs error with kind usage (so the process exits 2), and stdout must stay
+// empty because the envelope goes to stderr.
+func TestUnknownCommandIsAUsageError(t *testing.T) {
+	cmd := NewRootCmd(BuildInfo{Version: "test", Commit: "abc1234", Date: "2026-10-28"})
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"inventado"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("an unknown command must fail")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) {
+		t.Fatalf("the error must carry a contract kind, got %v", err)
+	}
+	if e.Kind != errs.KindUsage {
+		t.Errorf("unknown command kind = %q, want usage", e.Kind)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout must stay empty, got %q", stdout.String())
+	}
+}
+
+// An unknown flag is also a usage error, with stdout empty.
+func TestUnknownFlagIsAUsageError(t *testing.T) {
+	cmd := NewRootCmd(BuildInfo{Version: "test", Commit: "abc1234", Date: "2026-10-28"})
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"version", "--bogus"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("an unknown flag must fail")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) {
+		t.Fatalf("the error must carry a contract kind, got %v", err)
+	}
+	if e.Kind != errs.KindUsage {
+		t.Errorf("unknown flag kind = %q, want usage", e.Kind)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout must stay empty, got %q", stdout.String())
 	}
 }
 
