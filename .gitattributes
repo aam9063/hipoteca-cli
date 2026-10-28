@@ -1,4 +1,8 @@
 * text=auto eol=lf
+
+# Los scripts se ejecutan en sh/bash: LF y nunca CRLF
+*.sh text eol=lf
+
 *.png binary
 *.jpg binary
 *.ico binary
