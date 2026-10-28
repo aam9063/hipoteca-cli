@@ -17,4 +17,4 @@ install_if_missing() {
 }
 
 install_if_missing staticcheck "honnef.co/go/tools/cmd/staticcheck@2025.1.1"
-install_if_missing govulncheck "golang.org/x/vuln/cmd/govulncheck@latest"
+install_if_missing govulncheck "golang.org/x/vuln/cmd/govulncheck@v1.9.0"
