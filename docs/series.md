@@ -33,7 +33,9 @@ Medias mensuales calculadas por EMMI. Tipo de referencia oficial del mercado hip
 | `euribor-6m` | `D_1NBAE972` | Euríbor a 6 meses | Mensual | 3 | — |
 | `euribor-1y` | `D_1NBAF472` | Euríbor a 1 año | Mensual | 3 | Ene 1999 |
 
-`euribor-1y` es el que usan la mayoría de las hipotecas variables en España.
+`euribor-1y` es el índice que aparece en la mayoría de las escrituras de tipo variable que
+se ven en España; por eso es el que se usa en todos los ejemplos del arranque. La CLI no
+lo asume: cada préstamo declara su índice en config.
 
 ### 1.2 Otros índices oficiales del mercado hipotecario
 
@@ -157,7 +159,8 @@ cliente. Esa decisión es de CMD-01.
 ]
 ```
 
-El orden del array sigue el orden de los códigos pedidos.
+El orden del array sigue el orden de los códigos pedidos (comprobado en
+`favoritas-14-indices.json`).
 
 ### 3.2 `listaSeries` (éxito) — array con un objeto por serie
 
@@ -231,7 +234,10 @@ año-mes de `fechas` con el último ya visto en la base de datos local.
 - La **hora no es significativa y no es estable**: en la misma descarga, enero-marzo de
   2026 vienen con `T09:15:00Z` y abril-septiembre con `T08:15:00Z`. Solo el año-mes
   identifica la observación.
-- El día es siempre `01` en las series mensuales.
+- El día es siempre `01` en las series mensuales, y la hora varía entre `08:15` y
+  `09:15` dentro de la misma descarga (comprobado en los seis fixtures de `listaSeries`).
+- `fechaInicio` y `fechaFin` describen la serie completa, no el rango pedido: en el
+  fixture del año 2026 siguen siendo 1999-01 y 2026-09.
 - `hipoteca-cli` compara y ordena por año-mes, nunca por el instante completo.
 
 ---
@@ -279,7 +285,8 @@ Reglas de traducción para `internal/bde` → `errs` (arranque §6.4):
 
 ## 8. Licencia y atribución
 
-Los términos de uso de las estadísticas del Banco de España permiten el acceso y la
+Condiciones tomadas de los términos de uso de las estadísticas del Banco de España citados
+en el arranque (§2.3); esta sección no sustituye a la fuente. Permiten el acceso y la
 reutilización libres y gratuitos, también comercialmente, con estas condiciones:
 
 - Citar la fuente. Datos sin procesar: `Fuente: Sitio web del Banco de España (www.bde.es)`.
