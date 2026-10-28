@@ -1,0 +1,175 @@
+# Cálculos: fórmulas, convenciones y casos de referencia
+
+Resultado de SPIKE-02. Este documento fija las fórmulas y convenciones de cálculo de la
+CLI y describe los casos de referencia de `testdata/finance/`, calculados **fuera del
+proyecto** con dos métodos independientes. FIN-01 a FIN-04 prueban `internal/finance`
+contra estos casos; ningún agente puede "arreglar" un caso para que pase un test
+(arranque §9).
+
+- Generador: `testdata/finance/generate.py` (Python + `decimal.Decimal`, contraste con
+  `numpy-financial`). No es código de producto y no entra en el binario.
+- Origen y justificación de los casos: `testdata/finance/README.md`.
+- Los valores de índice de los casos 6 a 8 son **hipotéticos y fijos** (no son datos del
+  Banco de España): sirven para fijar el recálculo de la cuota, el suelo y el redondeo.
+
+---
+
+## 1. Convenciones (las decisiones de SPIKE-02)
+
+### 1.1 Tipo mensual nominal
+
+```
+i = TIN / 100 / 12
+```
+
+Es el estándar del sistema francés en las escrituras españolas y el valor por defecto de
+`interest_convention` (`monthly-nominal`). Justificación: es lo que hacen las escrituras y
+los recibos reales; separarse de ello haría que cada cifra difiriera del banco sin motivo.
+
+**No soportado en v1:** la conversión de tipo efectivo anual a mensual
+(`(1 + TIN/100)^(1/12) − 1`). Si algún día hace falta, es otro valor de la misma opción
+`interest_convention`, en su PR aparte.
+
+### 1.2 Cuota (sistema francés)
+
+```
+C = P · i / (1 − (1 + i)^−n)
+```
+
+con `P` el capital pendiente y `n` los meses restantes. Con `i = 0`: `C = P / n` (sin
+división por cero; caso 2). Justificación: es la fórmula de la escritura y la que
+reproducen las hojas de cálculo (función PAGO) y `numpy_financial.pmt`.
+
+### 1.3 Redondeo de la cuota
+
+Half-up a céntimos (`payment_rounding = "half-up-cents"`). La cuota se calcula con
+precisión completa y se redondea **una sola vez**; a partir de ahí es constante. **La
+última cuota absorbe el residuo** para que el capital final sea exactamente `0.00`.
+
+Justificación: es lo que hace un recibo real (la última cuota casi nunca coincide al
+céntimo con las anteriores) y evita arrastrar un céntimo de diferencia durante 300
+cuotas. Por diseño, el capital final del cuadro es exactamente `0.00`: la tolerancia
+explícita de `±0.01` existe **solo** para comparar con terceros (otros simuladores, el
+banco), nunca para justificar un residuo en nuestra propia simulación.
+
+### 1.4 Interés del mes
+
+```
+interés_mes = redondeo_half_up_a_céntimos(P · i)
+amortización = C − interés_mes
+P_nuevo = P − amortización
+```
+
+El interés se redondea a céntimos **antes** de calcular la amortización. Justificación:
+la alternativa (arrastrar el interés sin redondear y redondear solo al final) da totales
+que difieren en céntimos y hay que elegir una; redondear cada mes es lo más próximo a un
+recibo real, donde cada apunte es un importe con céntimos.
+
+### 1.5 Revisión, suelo y redondeo de escritura
+
+En cada revisión:
+
+1. `TIN bruto = índice(mes de referencia) + diferencial`
+2. **Suelo**: `TIN = max(TIN bruto, suelo)` (si hay suelo)
+3. **Redondeo de escritura** (`rate_rounding`): por ejemplo `1/8` → múltiplo de 0.125 más
+   próximo, half-up. El suelo se aplica **antes** del redondeo (caso 7).
+4. La cuota se **recalcula** con el capital pendiente y los meses restantes, aplicando las
+   convenciones 1.2–1.4.
+
+La amortización anticipada usa la misma maquinaria: comisión
+`= importe · early_repayment_fee_pct / 100`; en `reduce-payment` se recalcula la cuota con
+el mismo plazo restante; en `reduce-term` se mantiene la cuota y el plazo es el número de
+meses que tarda en cerrarse (la última cuota absorbe el residuo).
+
+### 1.6 Tolerancia de cierre
+
+El capital final del cuadro es exactamente `0.00` por diseño (convención 1.3). La
+tolerancia de `±0.01` de los tests es solo de contraste con terceros. Ver convención 1.3.
+
+---
+
+## 2. Caso 1 resuelto a mano (verificable con calculadora)
+
+Entradas: capital `150000.00`, TIN `3.10 %`, 300 meses.
+
+**Tipo mensual:** `i = 3.10 / 100 / 12 = 0.0025833333…` (el 3 se repite).
+
+**Cuota:**
+
+```
+C = 150000 · 0.0025833333… / (1 − (1.0025833333…)^−300)
+  = 387.50 / (1 − 0.4611…)            [el denominador da 0.5388…]
+  = 719.143281…                        → redondeo half-up → 719.14
+```
+
+**Mes 1:**
+
+```
+interés      = 150000 · 0.0025833333… = 387.50        (exacto)
+amortización = 719.14 − 387.50        = 331.64
+capital pendiente = 150000.00 − 331.64 = 149668.36
+```
+
+**Última cuota (mes 300):** el capital pendiente antes de la última cuota es `718.84`,
+el interés de ese mes es `1.86`, y la cuota final **no** es 719.14 sino que absorbe el
+residuo: `720.70 = 718.84 + 1.86`. Capital final: exactamente `0.00`.
+
+**Totales:** intereses `65743.56`; total pagado `215743.56 = 65743.56 + 150000.00`.
+
+## 3. La tabla de los diez casos
+
+| # | Caso | Entradas | Cuota inicial | Cuota tras el cambio | Interés total |
+|---|---|---|---|---|---|
+| 1 | Fijo base | 150000.00 · 3.10 % · 300 m | 719.14 | 719.14 (última: 720.70) | 65743.56 |
+| 2 | Tipo 0 % | 120000.00 · 0.00 % · 240 m | 500.00 | 500.00 | 0.00 |
+| 3 | Tipo bajo | 90000.00 · 0.50 % · 180 m | 519.09 | 519.09 | 3435.95 |
+| 4 | Plazo corto, tipo alto | 60000.00 · 6.25 % · 60 m | 1166.96 | 1166.96 | 10017.30 |
+| 5 | Importes feos | 183450.75 · 2.37 % · 347 m | 730.87 | 730.87 | 70160.13 |
+| 6 | Mixta 12 m | 150000.00 · 1.25 % → revisiones anuales, índices hipotéticos + 0.890 · 240 m | 706.70 | 789.13 (tramo 8, TIN 2.140) | 42214.52 |
+| 7 | Suelo | 150000.00 · 3.500 % 12 m → índice 1.500 + 0.890 = 2.390 → suelo 3.000 · 240 m | 869.94 | 833.54 (TIN 3.000) | 50486.52 |
+| 8 | Redondeo 1/8 | 150000.00 · 3.101 % 12 m → índice 2.211 + 0.890 = 3.101 → 3.125 · 240 m | 839.50 | 841.23 (TIN 3.125) | 51875.54 |
+| 9 | Amortiza, reduce-payment | como caso 1; amortiza 10000.00 tras la cuota 60, comisión 0 % | 719.14 | 663.18 | 62312.38 (ahorro 3431.18) |
+| 10 | Amortiza, reduce-term | como caso 1; amortiza 10000.00 tras la cuota 60, comisión 0 % | 719.14 | 719.14 (última: 694.82; plazo 275 m, 25 menos) | 57739.18 (ahorro 8004.38) |
+
+Notas de la tabla:
+
+- En los casos 6 a 8 la cuota inicial es la del tramo inicial y la "cuota tras el cambio"
+  la de la primera revisión (mes 13). Los tramos completos del caso 6 están en el JSON
+  (`expected.revisions`): TIN 2.390 → 782.90, 2.890 → 816.13, 3.390 → 848.46,
+  3.890 → 879.78, 3.640 → 864.90, 3.140 → 837.36, 2.640 → 812.12, 2.140 → 789.13.
+- En los casos 9 y 10 el interés total se compara con el caso 1 (el mismo préstamo sin
+  amortizar: 65743.56). El ahorro es diferencia de intereses, nunca una recomendación
+  (P-08): decidir entre reducir cuota o plazo es del usuario.
+- En los casos 9 y 10 la suma de amortizaciones del cuadro es 140000.00; junto con la
+  amortización anticipada de 10000.00 suma el capital original de 150000.00. El JSON lo
+  explicita (`sum_principal_repaid_schedule_only`).
+
+## 4. Cómo se generaron y cómo se contrastan
+
+Cada JSON de `testdata/finance/` se escribió ejecutando el generador, nunca a mano:
+
+1. **Método principal:** simulación exacta con `decimal.Decimal` (precisión 50) y
+   `ROUND_HALF_UP` a céntimos, implementando las convenciones de la sección 1.
+2. **Contraste:** la cuota de cada tramo se compara con `numpy_financial.pmt`. Si los dos
+   métodos difieren en más de `0.01`, el generador **falla y no escribe ningún caso**.
+   En `reduce-term` se comprueba además que el plazo resultante es el mínimo que cierra
+   el préstamo con la cuota mantenida.
+3. **Determinismo:** ejecutar el generador dos veces produce archivos idénticos byte a
+   byte (fecha de generación fija `2026-10-28`, sin timestamps volátiles).
+
+Cada JSON lleva en `source`: versiones de Python/NumPy/numpy-financial, métodos usados,
+tolerancia del contraste, sha256 del propio generador y fecha de generación.
+
+## 5. Qué NO soporta v1 y qué viene después
+
+- Conversión de tipo efectivo anual a mensual: no (ver 1.1).
+- Otras reglas de redondeo de cuota distintas de half-up a céntimos: no.
+- Otras reglas de redondeo de tipo distintas de las listadas en `rate_rounding`
+  (`none`, `1/8`, `1/4`, `0.05`): no.
+- Base de cálculo por días (interest only pro-rata die): no; todo es mensualidad completa.
+
+Los casos reales de H-03 (recibos bancarios anonimizados) **reemplazarán o confirmarán**
+estos casos cuando estén disponibles: este spike es el sustituto acordado con el usuario,
+no su reemplazo definitivo. Si un caso de referencia discrepa del cálculo de
+`internal/finance`, se para y se pregunta; nunca se edita el caso para que pase
+(arranque §9).
