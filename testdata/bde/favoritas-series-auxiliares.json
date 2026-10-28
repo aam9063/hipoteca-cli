@@ -1,0 +1,47 @@
+[
+  {
+    "serie": "D_1T9H0000A",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Información adicional sobre préstamos el cálculo del irph. Importe agregado de préstamos",
+    "codFrecuencia": "M",
+    "decimales": 0,
+    "simbolo": "K  EUR",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 4447519
+  },
+  {
+    "serie": "D_1T9H0000B",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Información adicional sobre préstamos el cálculo del irph. Número de operaciones",
+    "codFrecuencia": "M",
+    "decimales": 0,
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 24498
+  },
+  {
+    "serie": "D_1T9H0000C",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Información adicional sobre préstamos el cálculo del irph. Entidades contribuidoras",
+    "codFrecuencia": "M",
+    "decimales": 0,
+    "simbolo": "Entidades",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 21
+  },
+  {
+    "codigo": "D_1TFECHABOE",
+    "errNum": 404
+  },
+  {
+    "codigo": "D_1TFECHABOE2",
+    "errNum": 404
+  },
+  {
+    "codigo": "D_1TFECHABOE3",
+    "errNum": 404
+  },
+  {
+    "codigo": "D_1TFECHABOE4",
+    "errNum": 404
+  }
+]

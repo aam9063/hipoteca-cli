@@ -1,0 +1,5 @@
+{
+  "errNum": 412,
+  "errMsgUsr": "Error de validación en la solicitud",
+  "errMsgDebug": "El rango 12M no es correcto"
+}
