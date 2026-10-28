@@ -1,0 +1,202 @@
+# Catálogo de índices del Banco de España que usa hipoteca-cli.
+#
+# Fuente: Sitio web del Banco de España (www.bde.es)
+# Elaboración propia con datos extraídos del sitio web del Banco de España (www.bde.es)
+#
+# Contrato documentado en docs/series.md. Este archivo se embebe en el binario
+# (go:embed) y los códigos se pueden sobrescribir desde config.toml si el Banco los
+# cambia (arranque §7).
+#
+# `id` es el identificador estable que aceptan los comandos: renombrarlo es un cambio de
+# contrato (P-09). `code` es el código de serie del Banco de España.
+#
+# Ningún valor de esta tabla se deduce por patrón: cada código se verificó contra la API
+# el 2026-10-28 y las capturas están en testdata/bde/.
+
+schema_version: 1
+verified_at: "2026-10-28"
+endpoint_base: "https://app.bde.es/bierest/resources/srdatosapp/"
+language: "es"
+
+# Vocabulario de `frequency`: monthly (todas las series del catálogo son mensuales).
+# `tenor`: plazo del índice. 1w, 1m, 3m, 6m, 1y, 3y, 5y; "3y+" = más de 3 años;
+# "2a6y" / "1a5y" = rango entre ambos plazos. `unit`: percent.
+# `decimals`: decimales que publica el Banco de España para esa serie.
+
+indices:
+  - id: euribor-1y
+    code: D_1NBAF472
+    name: "Euríbor a 1 año"
+    family: euribor
+    tenor: 1y
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. Euríbor. A 12 meses"
+    first_value: "1999-01"
+
+  - id: euribor-6m
+    code: D_1NBAE972
+    name: "Euríbor a 6 meses"
+    family: euribor
+    tenor: 6m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 6 meses. Euríbor. Tipo de referencia oficial del mercado hipotecario"
+
+  - id: euribor-3m
+    code: D_1NBAD972
+    name: "Euríbor a 3 meses"
+    family: euribor
+    tenor: 3m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 3 meses. Euríbor. Tipo de referencia oficial del mercado hipotecario"
+
+  - id: euribor-1m
+    code: D_1NBAC972
+    name: "Euríbor a 1 mes"
+    family: euribor
+    tenor: 1m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 1 mes. Euríbor. Tipo de referencia oficial del mercado hipotecario"
+
+  - id: euribor-1w
+    code: D_1NBAS972
+    name: "Euríbor a 1 semana"
+    family: euribor
+    tenor: 1w
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 1 semana. Euríbor. Tipo de referencia oficial del mercado hipotecario"
+
+  - id: irph
+    code: D_1T9H0000
+    name: "IRPH conjunto de entidades de crédito"
+    family: irph
+    tenor: 3y+
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Más de 3 años. Conjunto EC España"
+    first_value: "1990-11"
+
+  - id: irs-5y
+    code: D_1T9H0011
+    name: "IRS a 5 años"
+    family: irs
+    tenor: 5y
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. IRS a 5 años"
+    first_value: "2009-03"
+
+  - id: deuda-publica-2a6
+    code: D_1T9H0004
+    name: "Rendimiento interno de la deuda pública de 2 a 6 años"
+    family: deuda-publica
+    tenor: 2a6y
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Rendimiento interno deuda pública 2 a 6 años. Mercado secundario"
+
+  - id: hipotecario-ue-1a5
+    code: D_1T9H0010
+    name: "Tipo medio de los préstamos hipotecarios de 1 a 5 años (UEM)"
+    family: hipotecario-ue
+    tenor: 1a5y
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Entre 1 y 5 años. Conjunto EC UEM"
+
+  # La familia *572 comparte descripcionCorta en la API: el plazo se confirmó en
+  # informacion[].[Descripción] de listaSeries (docs/series.md §1.3).
+  - id: estr-1w
+    code: D_1NBAS572
+    name: "€STR a 1 semana"
+    family: estr
+    tenor: 1w
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. €STR a una semana (media del último dato diario del mes)"
+    api_description: "ECONOMIA MUNDIAL TIPO DE INTERÉS A UNA SEMANA MERCADOS UEM INTERBANCARIO ESTER MTIPOS DE INTERES A UNA SEMANA DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+    first_value: "2020-10"
+
+  - id: estr-1m
+    code: D_1NBAC572
+    name: "€STR a 1 mes"
+    family: estr
+    tenor: 1m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. €STR a 1 mes"
+    api_description: "ECONOMIA MUNDIAL TIPO DE INTERÉS A UN MES MERCADOS UEM INTERBANCARIO ESTER TIPOS DE INTERES A UN MES DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+    first_value: "2020-10"
+
+  - id: estr-3m
+    code: D_1NBAD572
+    name: "€STR a 3 meses"
+    family: estr
+    tenor: 3m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. €STR a 3 meses"
+    api_description: "ECONOMIA MUNDIAL TIPO DE INTERÉS A TRES MESES MERCADOS UEM INTERBANCARIO ESTER TIPOS DE INTERES A TRES MESES DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+    first_value: "2020-10"
+
+  - id: estr-6m
+    code: D_1NBAE572
+    name: "€STR a 6 meses"
+    family: estr
+    tenor: 6m
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. €STR a 6 meses"
+    api_description: "ECONOMIA MUNDIAL TIPO DE INTERÉS A SEIS MESES MERCADOS UEM INTERBANCARIO ESTER TIPOS DE INTERES A SEIS MESES DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+    first_value: "2020-10"
+
+  - id: estr-1y
+    code: D_1NBAF572
+    name: "€STR a 1 año"
+    family: estr
+    tenor: 1y
+    frequency: monthly
+    decimals: 3
+    unit: percent
+    description: "Tipos de interés. UEM. Mercado monetario. €STR a 1 año"
+    api_description: "ECONOMIA MUNDIAL TIPO DE INTERÉS A 1 AÑO MERCADOS UEM INTERBANCARIO ESTER TIPOS DE INTERES A UN AÑO DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+    first_value: "2020-10"
+
+# Series del Banco que no son índices hipotecarios pero sostienen el cálculo del IRPH.
+# No se ofrecen como --index y no son porcentajes (ver docs/series.md §1.4).
+#
+# Las series de fecha de publicación en el BOE (D_1TFECHABOE*) NO están disponibles en la
+# API: favoritas las devuelve con errNum 404 aunque figuren en el CSV del Boletín.
+auxiliary:
+  - code: D_1T9H0000A
+    name: "Importe agregado de los préstamos usados para calcular el IRPH"
+    role: irph_amount
+    unit: "K  EUR"
+    decimals: 0
+  - code: D_1T9H0000B
+    name: "Número de operaciones usadas para calcular el IRPH"
+    role: irph_operations
+    unit: ""
+    decimals: 0
+  - code: D_1T9H0000C
+    name: "Entidades contribuidoras al cálculo del IRPH"
+    role: irph_contributors
+    unit: "Entidades"
+    decimals: 0
