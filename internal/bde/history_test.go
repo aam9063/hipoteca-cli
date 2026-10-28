@@ -1,6 +1,7 @@
 package bde
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 // el mes en curso), orden ascendente aunque el fixture baja descendente.
 func TestHistoryTreintaMeses(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "listaSeries-euribor-1y-30M.json"), 0)
-	s, err := c.History("euribor-1y", Rango30M)
+	s, err := c.History(context.Background(), "euribor-1y", Rango30M)
 	assertNoErr(t, err)
 	if s.Code != "D_1NBAF472" {
 		t.Fatalf("código = %q, se esperaba D_1NBAF472", s.Code)
@@ -43,7 +44,7 @@ func TestHistoryTreintaMeses(t *testing.T) {
 
 func TestHistoryMAX(t *testing.T) {
 	_, c := newFixtureClient(t, fixture(t, "listaSeries-euribor-1y-MAX.json"), 0)
-	s, err := c.History("euribor-1y", RangoMAX)
+	s, err := c.History(context.Background(), "euribor-1y", RangoMAX)
 	assertNoErr(t, err)
 	if len(s.Observations) != 333 {
 		t.Fatalf("puntos = %d, se esperaban 333", len(s.Observations))
@@ -73,7 +74,7 @@ func TestHistoryAnioCerrado2025(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "listaSeries-euribor-1y-2025.json"), 0)
 	r, err := RangoAnio(2025)
 	assertNoErr(t, err)
-	s, err := c.History("euribor-1y", r)
+	s, err := c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 	if len(s.Observations) != 12 {
 		t.Fatalf("puntos = %d, se esperaban 12", len(s.Observations))
@@ -97,7 +98,7 @@ func TestHistoryAnio2026MesNoPublicado(t *testing.T) {
 	_, c := newFixtureClient(t, fixture(t, "listaSeries-euribor-1y-2026.json"), 0)
 	r, err := RangoAnio(2026)
 	assertNoErr(t, err)
-	s, err := c.History("euribor-1y", r)
+	s, err := c.History(context.Background(), "euribor-1y", r)
 	assertNoErr(t, err)
 	if len(s.Observations) != 9 {
 		t.Fatalf("puntos = %d, se esperaban 9", len(s.Observations))
@@ -117,7 +118,7 @@ func TestHistoryAnio2026MesNoPublicado(t *testing.T) {
 // ambiguo ("¤STR" sin plazo), se parsea igual y conserva 2.44 con su escala.
 func TestHistoryEstr1W(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "listaSeries-estr-1w-30M.json"), 0)
-	s, err := c.History("estr-1w", Rango30M)
+	s, err := c.History(context.Background(), "estr-1w", Rango30M)
 	assertNoErr(t, err)
 	if s.Code != "D_1NBAS572" {
 		t.Fatalf("código = %q, se esperaba D_1NBAS572", s.Code)
@@ -137,7 +138,7 @@ func TestHistoryEstr1W(t *testing.T) {
 
 func TestHistoryIRPH(t *testing.T) {
 	_, c := newFixtureClient(t, fixture(t, "listaSeries-irph-30M.json"), 0)
-	s, err := c.History("irph", Rango30M)
+	s, err := c.History(context.Background(), "irph", Rango30M)
 	assertNoErr(t, err)
 	if s.Code != "D_1T9H0000" {
 		t.Fatalf("código = %q, se esperaba D_1T9H0000", s.Code)
@@ -161,11 +162,28 @@ func assertAscending(t *testing.T, obs []Observation) {
 	}
 }
 
+// TestHistoryOrdenAscendenteEsAPIChanged: el cliente invierte el orden
+// descendente de la API (docs/series.md §3.2); si algún día llegara ascendente,
+// invertirla entregaría (y cachearía) una serie descendente sin que nadie lo
+// sepa. El orden se comprueba antes de invertir: contrato roto → api_changed/7.
+func TestHistoryOrdenAscendenteEsAPIChanged(t *testing.T) {
+	body := []byte(`[{"serie":"D_1NBAF472","codFrecuencia":"M","decimales":3,` +
+		`"fechaInicio":"2026-08-01T08:15:00Z","fechaFin":"2026-09-01T08:15:00Z",` +
+		`"fechas":["2026-08-01T08:15:00Z","2026-09-01T08:15:00Z"],` +
+		`"valores":[2.954,3.247]}]`)
+	_, c := newFixtureClient(t, body, 0)
+	s, err := c.History(context.Background(), "euribor-1y", Rango30M)
+	assertErr(t, err, errs.KindAPIChanged, 7)
+	if s.Code != "" || len(s.Observations) != 0 {
+		t.Fatalf("un contrato roto no devuelve series: %+v", s)
+	}
+}
+
 // TestHistorySerieInexistente: errNum 412 con "La serie XX no existe" →
 // not_found/4 (docs/series.md §6).
 func TestHistorySerieInexistente(t *testing.T) {
 	ts, c := newFixtureClient(t, fixture(t, "error-listaSeries-serie-inexistente.json"), 0)
-	_, err := c.History("euribor-1y", RangoMAX)
+	_, err := c.History(context.Background(), "euribor-1y", RangoMAX)
 	assertErr(t, err, errs.KindNotFound, 4)
 	if ts.hits.Load() != 1 {
 		t.Fatalf("peticiones = %d, se esperaba 1", ts.hits.Load())
@@ -176,7 +194,7 @@ func TestHistorySerieInexistente(t *testing.T) {
 // enviamos; un 412 de rango significa que el contrato cambió → api_changed/7.
 func TestHistoryRangoInvalido(t *testing.T) {
 	_, c := newFixtureClient(t, fixture(t, "error-listaSeries-rango-invalido.json"), 0)
-	_, err := c.History("euribor-1y", RangoMAX)
+	_, err := c.History(context.Background(), "euribor-1y", RangoMAX)
 	assertErr(t, err, errs.KindAPIChanged, 7)
 }
 
@@ -184,13 +202,13 @@ func TestHistoryRangoInvalido(t *testing.T) {
 // solo puede significar un contrato roto → api_changed/7.
 func TestHistorySinIdioma(t *testing.T) {
 	_, c := newFixtureClient(t, fixture(t, "error-listaSeries-sin-idioma.json"), 0)
-	_, err := c.History("euribor-1y", Rango30M)
+	_, err := c.History(context.Background(), "euribor-1y", Rango30M)
 	assertErr(t, err, errs.KindAPIChanged, 7)
 }
 
 func TestHistoryIdDesconocido(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("[]"), 0)
-	_, err := c.History("indice-inventado", Rango30M)
+	_, err := c.History(context.Background(), "indice-inventado", Rango30M)
 	assertErr(t, err, errs.KindNotFound, 4)
 	if !strings.Contains(err.Error(), "indice-inventado") {
 		t.Fatalf("el error debe nombrar el id: %s", err.Error())
@@ -202,7 +220,7 @@ func TestHistoryIdDesconocido(t *testing.T) {
 
 func TestHistoryRangoVacio(t *testing.T) {
 	ts, c := newFixtureClient(t, []byte("[]"), 0)
-	_, err := c.History("euribor-1y", Rango{})
+	_, err := c.History(context.Background(), "euribor-1y", Rango{})
 	assertErr(t, err, errs.KindUsage, 2)
 	if ts.hits.Load() != 0 {
 		t.Fatalf("no debió haber petición; hubo %d", ts.hits.Load())

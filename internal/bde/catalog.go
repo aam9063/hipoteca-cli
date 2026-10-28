@@ -89,12 +89,28 @@ func LoadCatalog(overrides map[string]string) (*Catalog, error) {
 				fmt.Sprintf("la configuración sobrescribe el id %q, que no existe en el catálogo de series del Banco de España", id),
 				"usa un id del catálogo o elimina esa entrada de [indices] en config.toml")
 		}
+		if code == "" {
+			return nil, errs.New(errs.KindInternal,
+				fmt.Sprintf("la configuración da al índice %q un código de serie vacío", id),
+				"usa el código del Banco de España para ese índice o elimina esa entrada de [indices] en config.toml")
+		}
 		idx.Code = code
 		cat.byID[id] = idx
 	}
+	// Un override a un código vacío deja el índice sin código de serie y un
+	// override que repite el código de otro índice colisiona en byCode (código
+	// → id) y en la clave de caché: los dos se rechazan en vez de colapsar en
+	// silencio (arranque §7: los overrides reemplazan el code, nunca corrompen
+	// el catálogo).
 	cat.byCode = make(map[string]string, len(cat.ids))
 	for _, id := range cat.ids {
-		cat.byCode[cat.byID[id].Code] = id
+		code := cat.byID[id].Code
+		if prev, ok := cat.byCode[code]; ok {
+			return nil, errs.New(errs.KindInternal,
+				fmt.Sprintf("la configuración hace que los índices %q y %q compartan el mismo código de serie %q", prev, id, code),
+				"cada índice necesita un código de serie propio; revisa [indices] en config.toml")
+		}
+		cat.byCode[code] = id
 	}
 	return cat, nil
 }
