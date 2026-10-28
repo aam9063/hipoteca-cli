@@ -4,6 +4,8 @@
 package cli
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +31,18 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		// Errors and usage are printed by main, not by cobra, so stdout stays clean.
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// The completion command is not part of the CLI contract (P-01): it is not
+		// enabled.
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
+			// P-01: stdout carries a single JSON value per command. With no subcommand
+			// there is no result, so the help goes to stderr and the command fails,
+			// leaving stdout empty.
+			cmd.SetOut(cmd.ErrOrStderr())
+			if err := cmd.Help(); err != nil {
+				return err
+			}
+			return errors.New("esperando un subcomando: ejecute \"hipoteca --help\" para ver los disponibles")
 		},
 	}
 
