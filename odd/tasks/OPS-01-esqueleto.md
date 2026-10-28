@@ -1,0 +1,104 @@
+# OPS-01: esqueleto del repositorio
+
+## Objetivo
+
+Dejar un repositorio que compila, se testea y se valida igual en Linux, macOS y Windows,
+con las capas de la arquitectura declaradas y las puertas de calidad activas, para que
+CORE-01, CORE-02, BDE-01, FIN-01 y OPS-02 puedan trabajar encima sin discutir estructura.
+
+## Problema y motivo
+
+Todo el backlog de la Ola 1 depende de OPS-01. Sin `go.mod`, sin `make check` y sin CI no
+hay dónde poner un test en rojo, ni forma de detectar que `internal/finance` se contaminó
+con `float64` o que un PR se saltó el review gate.
+
+## Alcance
+
+- Dentro:
+  - Módulo `github.com/aam9063/hipoteca-cli` con Go 1.25.
+  - `cmd/hipoteca` y el árbol de `internal/` de §8.3, cada capa con su `doc.go`
+    declarando la regla que la hace distinta (pureza de `finance`, monopolio HTTP de
+    `bde`, contrato de `model`).
+  - `make build`, `make check`, `make test`, `make golden`, `make live`, `make tools`.
+  - CI en matriz Linux/macOS/Windows con `make build` y `make check`, más el job que
+    exige `odd/reviews/<id>.md` cuando el título del PR lleva ID (§12).
+  - `AGENTS.md` de §11 tal cual, `CLAUDE.md`, `README.md` con atribución y avisos,
+    `LICENSE` MIT, `CHANGELOG.md` y `.goreleaser.yaml`.
+  - Un único comando real, `hipoteca version`, en JSON, que sirve de humo y de destino de
+    los `ldflags`.
+- Fuera:
+  - Comandos de producto (`index`, `revision`, `schedule`, ...) y el sobre de error con
+    los códigos 0-130: son CORE-01.
+  - `cobra` como árbol completo de subcomandos, TOML, decimal y SQLite: entran con las
+    tareas que los usan (CORE-02, FIN-01, WATCH-01). Añadir dependencias sin uso rompería
+    `go mod tidy`, que el propio check verifica.
+  - El job nocturno contra la API real: necesita `internal/bde` (BDE-01).
+
+## Restricciones
+
+- P-01: stdout lleva un único valor JSON; diagnóstico por stderr.
+- P-02: los códigos de salida estables viven en `internal/errs` (CORE-01); `main` todavía
+  sale con 1 y lo deja anotado.
+- P-09: `version` fija su `schema_version: 1` ahora, y solo se amplía.
+
+## Superficie de edición (nuestra)
+
+- `go.mod`, `go.sum`, `Makefile`, `.gitignore`, `.goreleaser.yaml`, `CHANGELOG.md`,
+  `LICENSE`, `README.md`, `AGENTS.md`, `CLAUDE.md`
+- `cmd/**`, `internal/*/doc.go`, `internal/cli/**`
+- `scripts/**`, `.github/workflows/ci.yml`
+- `odd/tasks/OPS-01-esqueleto.md`, `odd/reviews/OPS-01.md`
+
+## Riesgo (nuestra)
+
+**Medio-alto.** Toca entrega y entorno (ítem 5 de la lista de riesgo: CI, dependencias de
+build) y nada de comportamiento de producto que un test pueda romper (ítem 6). Un CI mal
+configurado da falsa confianza: por eso el check no se limita a compilar, y la primera
+ejecución real en los tres sistemas es parte del criterio de aceptación.
+
+## Checklist
+
+- [x] OPS-01.1 `go.mod` con Go 1.25 y `cobra` como única dependencia · Criterio:
+      `go build ./...` limpio y `go mod tidy` sin cambios.
+- [x] OPS-01.2 `cmd/hipoteca` y las 11 capas de `internal/` con `doc.go` que declara su
+      regla · Criterio: `internal/finance/doc.go` prohíbe red, E/S, reloj y `float64`;
+      `internal/bde/doc.go` reclama el monopolio HTTP.
+- [x] OPS-01.3 `hipoteca version` en JSON con `schema_version` · Criterio: test en rojo
+      antes de implementar; un solo valor JSON en stdout, verificado por el test.
+- [x] OPS-01.4 `make check` = gofmt, `go mod tidy`, vet, staticcheck, govulncheck y tests,
+      con las herramientas en `./.bin` · Criterio: corre sin tocar el `GOPATH` del usuario
+      y falla si `go.mod` no está tidy.
+- [x] OPS-01.5 CI en matriz de tres sistemas + job de review gate · Criterio: el workflow
+      corre `make build` y `make check` en los tres y falla si un PR con ID no trae
+      `odd/reviews/<id>.md`.
+- [x] OPS-01.6 Documentos del repositorio · Criterio: `AGENTS.md` reproduce §11,
+      `README.md` incluye atribución dual, "no es asesoramiento" y "no afiliado", y
+      `LICENSE` es MIT.
+- [x] OPS-01.7 Verificación local de `make check` · Criterio: verde en este Windows.
+- [ ] OPS-01.8 Verificación en CI de los tres sistemas · Criterio: los tres jobs en verde
+      en el PR.
+- [ ] OPS-01.9 Review gate con informe en `odd/reviews/OPS-01.md`.
+
+## Evidencia de verificación
+
+Se completa al cerrar.
+
+## Progreso
+
+Contenido completo; pendiente la verificación en CI y el review gate.
+
+## Siguiente paso
+
+Push, PR, comprobar CI real en los tres sistemas y escribir el informe.
+
+## Log
+
+### L1 · 2026-10-28 · decisión del usuario
+
+Tras cerrar SPIKE-01, el usuario elige "OPS-01: esqueleto del repo" como siguiente paso.
+
+### L2 · 2026-10-28 · decisión técnica
+
+Este Windows no tiene `make`. En vez de instalar software en la máquina del usuario, el
+Makefile queda como interfaz delgada y `scripts/*.sh` como implementación, que es lo que
+corre la CI. `make check` y `bash scripts/check.sh` hacen exactamente lo mismo.
