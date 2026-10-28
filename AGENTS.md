@@ -22,6 +22,9 @@ hipoteca. Solo lectura frente a terceros.
 - Antes de cerrar: `make check` en verde y review gate con informe en
   `odd/reviews/<id>.md`. Una ronda de correcciones.
 - Rama `hc/<id>-descripcion`. Commit y PR. No hagas merge a `main`.
+- El merge a `dev` usa `--rebase`, así que **reescribe los ids**: los informes de review
+  citan el rango revisado y el PR, y la correspondencia con `dev` se anota al cerrar la
+  tarea. No abras un PR sólo para corregir hashes.
 
 ## Reglas duras
 

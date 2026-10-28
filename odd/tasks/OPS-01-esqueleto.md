@@ -77,7 +77,8 @@ ejecución real en los tres sistemas es parte del criterio de aceptación.
 - [x] OPS-01.7 Verificación local de `make check` · Criterio: verde en este Windows.
 - [x] OPS-01.8 Verificación en CI de los tres sistemas · Criterio: los tres jobs en verde
       en el PR. Run `40690111332`: ubuntu, macos y windows en success.
-- [ ] OPS-01.9 Review gate con informe en `odd/reviews/OPS-01.md`.
+- [x] OPS-01.9 Review gate con informe en `odd/reviews/OPS-01.md` · Criterio: PASS tras la
+      única ronda de correcciones, con la evidencia de los dos modos de fallo del `tidy`.
 
 ## Evidencia de verificación
 
@@ -103,13 +104,32 @@ run `40689508544`. No se añade ninguna mitigación para un problema que no ocur
 
 ## Progreso
 
-Contenido completo, CI verde en los tres sistemas (run `40690111332`), correcciones del
-review gate aplicadas. Pendiente: commit del informe y merge.
+**Cerrada.** PR #3 mergeado a `dev` con `--rebase`; run `40691442162` con los cuatro jobs
+en verde (`check` en ubuntu/macos/windows y `review gate report`).
+
+### Hashes
+
+El merge con rebase reescribe los ids, así que el informe de review cita los de la rama
+(el rango revisado) y aquí queda la correspondencia real con `dev`:
+
+| Revisado (rama) | En `dev` | Contenido |
+|---|---|---|
+| `7e408b9` | `8ace4f4` | build: bootstrap del módulo y las capas |
+| `2d83aee` | `1385328` | feat(cli): `version` con contrato JSON |
+| `107c97f` | `77d9789` | build(check): entrada portable del check |
+| `77fbd2d` | `10d751c` | docs: documentos del repositorio |
+| `24a6c5f` | `6013091` | ci: matriz de tres sistemas |
+| `f47db0f` | `9b20b47` | fix(ci): bit de ejecución de los scripts |
+| `ac1bb75` | `a4be17a` | fix(cli,ci): ronda única de review |
+| `fa9579d` | `eca15ed` | docs(ops-01): informe de review y evidencia de CI |
+
+La evidencia final es el run `40691442162` sobre `eca15ed`: los tres `check` y el
+`review gate report`, todos en success.
 
 ## Siguiente paso
 
-Commit de las correcciones + informe, push, CI verde con el review gate incluido, merge a
-`dev`.
+Ola 1 continúa con CORE-01, CORE-02 y FIN-01 (superficies disjuntas). FIN-01 necesita
+SPIKE-02 (`docs/calculos.md` + casos de referencia) y BDE-01 depende de CORE-02.
 
 ## Log
 
@@ -137,3 +157,9 @@ El review de contexto limpio devolvió PASS CON FIXES. Se aplica **una sola rond
 Descartado con evidencia: el hallazgo sobre `make` en `windows-latest` (el job pasó).
 Aceptado como transitorio: `exit 1` en `main`, que CORE-01 sustituye por los códigos del
 arranque §6.4.
+
+### L4 · 2026-10-28 · cierre
+
+CI final `40691442162` en verde (los tres checks y el review gate). PR #3 mergeado a `dev`
+con `--rebase --delete-branch`. El merge reescribe hashes: los informes de review citan el
+rango revisado y el PR, y la correspondencia con `dev` se anota al cerrar.
