@@ -134,6 +134,123 @@ func TestReproducedCaseNoPhantomRows(t *testing.T) {
 	}
 }
 
+// TestNegativeRateSchedule: un préstamo sin suelo con Euríbor negativo
+// (índice −0.5 % + diferencial 0.2 % = TIN −0.3 %, decisión 3 de FIN-02) debe
+// poder amortizarse: interés mensual negativo, amortización mayor que la
+// cuota, cierre exacto a 0.00 y suma de amortizaciones igual al capital. La
+// rejilla cubre plazos cortos y largos con tipos negativos suaves.
+func TestNegativeRateSchedule(t *testing.T) {
+	rates := []string{"-0.01", "-0.3", "-1.00"}
+	terms := []int{12, 240, 360}
+	for _, r := range rates {
+		for _, n := range terms {
+			loan := Loan{
+				Principal:  mustDecimal(t, "100000"),
+				AnnualRate: mustDecimal(t, r),
+				Months:     n,
+			}
+			label := r + "%·" + itoa(n)
+			t.Run(label, func(t *testing.T) {
+				sched := mustAmortization(t, loan)
+
+				if len(sched.Rows) < 1 || len(sched.Rows) > loan.Months {
+					t.Fatalf("filas = %d, se esperaba entre 1 y %d", len(sched.Rows), loan.Months)
+				}
+
+				payment, err := Payment(loan.Principal, loan.AnnualRate, loan.Months)
+				if err != nil {
+					t.Fatalf("Payment con tipo negativo: %v", err)
+				}
+				perMonth := loan.Principal.Div(mustDecimal(t, itoa(loan.Months)))
+				if !payment.LessThan(perMonth) {
+					t.Errorf("cuota %s no es menor que capital/meses %s", payment.String(), perMonth.String())
+				}
+
+				sumPrincipal := decimal.Zero
+				prevBalance := loan.Principal
+				first := true
+				for _, row := range sched.Rows {
+					if row.Payment.Sign() <= 0 {
+						t.Errorf("fila %d: cuota no positiva: %s", row.Month, row.Payment.String())
+					}
+					// El interés es negativo mientras el capital soporta
+					// céntimos; en las últimas filas |i|·capital puede
+					// redondear a 0.00 exacto, que también es válido.
+					if row.Interest.Sign() > 0 {
+						t.Errorf("fila %d: interés positivo con tipo negativo: %s", row.Month, row.Interest.String())
+					}
+					if first && row.Interest.Sign() >= 0 {
+						t.Errorf("primera fila: interés = %s, se esperaba negativo", row.Interest.String())
+					}
+					first = false
+					if row.Principal.Sign() <= 0 {
+						t.Errorf("fila %d: amortización no positiva: %s", row.Month, row.Principal.String())
+					}
+					if row.Balance.Sign() < 0 || row.Balance.GreaterThan(prevBalance) {
+						t.Errorf("fila %d: capital pendiente inválido: %s (anterior %s)",
+							row.Month, row.Balance.String(), prevBalance.String())
+					}
+					prevBalance = row.Balance
+					sumPrincipal = sumPrincipal.Add(row.Principal)
+				}
+				if !sumPrincipal.Equal(loan.Principal) {
+					t.Errorf("suma de amortizaciones = %s, se esperaba el capital %s",
+						sumPrincipal.String(), loan.Principal.String())
+					t.Errorf("última fila: capital = %s, se esperaba 0.00 exacto",
+						sched.Rows[len(sched.Rows)-1].Balance.String())
+				}
+				if sched.TotalInterest.Sign() >= 0 {
+					t.Errorf("interés total = %s, se esperaba negativo", sched.TotalInterest.String())
+				}
+				if !sched.TotalPaid.Equal(sched.TotalInterest.Add(loan.Principal)) {
+					t.Errorf("TotalPaid %s != TotalInterest %s + capital %s",
+						sched.TotalPaid.String(), sched.TotalInterest.String(), loan.Principal.String())
+				}
+			})
+		}
+	}
+}
+
+// TestCompoundScheduleNegativeRate: NewRate con índice negativo y sin suelo
+// devuelve un TIN negativo (decisión 3) y CompoundSchedule construye su cuadro
+// con el mismo núcleo, cerrando a 0.00 exacto.
+func TestCompoundScheduleNegativeRate(t *testing.T) {
+	rate, err := NewRate(mustDecimal(t, "-0.5"), mustDecimal(t, "0.2"), nil, RateRoundingNone)
+	if err != nil {
+		t.Fatalf("NewRate(-0.5, 0.2, nil, none): %v", err)
+	}
+	if rate.Final.Sign() >= 0 {
+		t.Fatalf("TIN final = %s, se esperaba negativo", rate.Final.String())
+	}
+
+	loan := Loan{Principal: mustDecimal(t, "100000"), AnnualRate: rate.Final, Months: 12}
+	sched, err := CompoundSchedule(loan, []Period{{Rate: rate.Final, Months: 12}})
+	if err != nil {
+		t.Fatalf("CompoundSchedule con TIN negativo: %v", err)
+	}
+	if len(sched.Rows) != 12 {
+		t.Fatalf("filas = %d, se esperaban 12", len(sched.Rows))
+	}
+	if !sched.Rows[len(sched.Rows)-1].Balance.IsZero() {
+		t.Errorf("capital final = %s, se esperaba 0 exacto",
+			sched.Rows[len(sched.Rows)-1].Balance.String())
+	}
+	sumPrincipal := decimal.Zero
+	for _, row := range sched.Rows {
+		if row.Interest.Sign() >= 0 {
+			t.Errorf("fila %d: interés no negativo: %s", row.Month, row.Interest.String())
+		}
+		sumPrincipal = sumPrincipal.Add(row.Principal)
+	}
+	if !sumPrincipal.Equal(loan.Principal) {
+		t.Errorf("suma de amortizaciones = %s, se esperaba el capital %s",
+			sumPrincipal.String(), loan.Principal.String())
+	}
+	if sched.TotalInterest.Sign() >= 0 {
+		t.Errorf("interés total = %s, se esperaba negativo", sched.TotalInterest.String())
+	}
+}
+
 // itoa evita importar strconv sólo para las etiquetas de la rejilla.
 func itoa(n int) string {
 	if n == 0 {
