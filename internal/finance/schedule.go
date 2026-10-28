@@ -42,6 +42,11 @@ type Schedule struct {
 // superaría capital + interés, esa mensualidad pasa a ser la última: paga
 // exactamente capital + interés, el capital queda en 0.00 y el bucle se
 // detiene, de modo que nunca se emiten filas con capital o cuota negativos.
+//
+// Con un tipo negativo (decisión 3 de FIN-02: préstamo sin suelo con índice
+// negativo) el interés mensual es negativo y la amortización de cada mes
+// supera la cuota, de modo que el préstamo cierra algo antes: la misma regla
+// de cierre de arriba lo cubre, sin cambios en el bucle.
 func Amortization(loan Loan) (Schedule, error) {
 	payment, err := Payment(loan.Principal, loan.AnnualRate, loan.Months)
 	if err != nil {
