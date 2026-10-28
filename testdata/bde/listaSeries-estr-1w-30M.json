@@ -1,0 +1,116 @@
+[
+  {
+    "serie": "D_1NBAS572",
+    "descripcion": "ECONOMIA MUNDIAL TIPO DE INTERÉS A UNA SEMANA MERCADOS UEM INTERBANCARIO ESTER MTIPOS DE INTERES A UNA SEMANA DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "informacion": [
+      {
+        "titulo": "Nombre",
+        "descripcion": "Tipos de interés. UEM. Mercado monetario. ¤STR"
+      },
+      {
+        "titulo": "Descripción",
+        "descripcion": "ECONOMIA MUNDIAL TIPO DE INTERÉS A UNA SEMANA MERCADOS UEM INTERBANCARIO ESTER MTIPOS DE INTERES A UNA SEMANA DE LOS DEPOSITOS INTERBANCARIOS (ULTIMO DATO DEL MES)"
+      },
+      {
+        "titulo": "Unidades",
+        "descripcion": "Porcentaje"
+      },
+      {
+        "titulo": "Decimales",
+        "descripcion": "3"
+      },
+      {
+        "titulo": "Número de observaciones",
+        "descripcion": "72"
+      },
+      {
+        "titulo": "Primer valor",
+        "descripcion": "[Oct 2020] -0,553 %"
+      },
+      {
+        "titulo": "Último valor",
+        "descripcion": "[Sep 2026] 2,440 %"
+      },
+      {
+        "titulo": "Valor mínimo",
+        "descripcion": "[May 2022] -0,586 %"
+      },
+      {
+        "titulo": "Valor máximo",
+        "descripcion": "[May 2024] 3,911 %"
+      }
+    ],
+    "fechaInicio": "2020-10-01T08:15:00Z",
+    "fechaFin": "2026-09-01T08:15:00Z",
+    "fechas": [
+      "2026-09-01T08:15:00Z",
+      "2026-08-01T08:15:00Z",
+      "2026-07-01T08:15:00Z",
+      "2026-06-01T08:15:00Z",
+      "2026-05-01T08:15:00Z",
+      "2026-04-01T08:15:00Z",
+      "2026-03-01T09:15:00Z",
+      "2026-02-01T09:15:00Z",
+      "2026-01-01T09:15:00Z",
+      "2025-12-01T09:15:00Z",
+      "2025-11-01T09:15:00Z",
+      "2025-10-01T08:15:00Z",
+      "2025-09-01T08:15:00Z",
+      "2025-08-01T08:15:00Z",
+      "2025-07-01T08:15:00Z",
+      "2025-06-01T08:15:00Z",
+      "2025-05-01T08:15:00Z",
+      "2025-04-01T08:15:00Z",
+      "2025-03-01T09:15:00Z",
+      "2025-02-01T09:15:00Z",
+      "2025-01-01T09:15:00Z",
+      "2024-12-01T09:15:00Z",
+      "2024-11-01T09:15:00Z",
+      "2024-10-01T08:15:00Z",
+      "2024-09-01T08:15:00Z",
+      "2024-08-01T08:15:00Z",
+      "2024-07-01T08:15:00Z",
+      "2024-06-01T08:15:00Z",
+      "2024-05-01T08:15:00Z",
+      "2024-04-01T08:15:00Z",
+      "2024-03-01T09:15:00Z"
+    ],
+    "valores": [
+      2.44,
+      2.189,
+      2.186,
+      2.182,
+      1.931,
+      1.933,
+      1.931,
+      1.933,
+      1.934,
+      1.928,
+      1.926,
+      1.93,
+      1.927,
+      1.926,
+      1.924,
+      1.927,
+      2.169,
+      2.168,
+      2.418,
+      2.666,
+      2.922,
+      2.913,
+      3.167,
+      3.166,
+      3.416,
+      3.666,
+      3.665,
+      3.664,
+      3.911,
+      3.909,
+      3.909
+    ]
+  }
+]

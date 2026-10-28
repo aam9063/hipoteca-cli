@@ -1,0 +1,142 @@
+[
+  {
+    "serie": "D_1NBAS972",
+    "descripcionCorta": "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 1 semana. Euríbor. Tipo de referencia oficial del mercado hipotecario",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.289
+  },
+  {
+    "serie": "D_1NBAC972",
+    "descripcionCorta": "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 1 mes. Euríbor. Tipo de referencia oficial del mercado hipotecario",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.414
+  },
+  {
+    "serie": "D_1NBAD972",
+    "descripcionCorta": "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 3 meses. Euríbor. Tipo de referencia oficial del mercado hipotecario",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.635
+  },
+  {
+    "serie": "D_1NBAE972",
+    "descripcionCorta": "Tipos de interés. UEM. Mercados monetarios. Depósitos. A 6 meses. Euríbor. Tipo de referencia oficial del mercado hipotecario",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.922
+  },
+  {
+    "serie": "D_1NBAF472",
+    "descripcionCorta": "Euribor a un año",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 3.247
+  },
+  {
+    "serie": "D_1T9H0000",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Más de 3 años. Conjunto EC España",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 3.189
+  },
+  {
+    "serie": "D_1T9H0011",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. IRS a 5 años",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 3.45
+  },
+  {
+    "serie": "D_1T9H0004",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Rendimiento interno deuda pública 2 a 6 años. Mercado secundario",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.983
+  },
+  {
+    "serie": "D_1T9H0010",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Entre 1 y 5 años. Conjunto EC UEM",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 3.6
+  },
+  {
+    "serie": "D_1NBAS572",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.44
+  },
+  {
+    "serie": "D_1NBAC572",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.298
+  },
+  {
+    "serie": "D_1NBAD572",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.231
+  },
+  {
+    "serie": "D_1NBAE572",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.107
+  },
+  {
+    "serie": "D_1NBAF572",
+    "descripcionCorta": "Tipos de interés. UEM. Mercado monetario. ¤STR",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "tendencia": "+",
+    "fechaValor": "2026-09-01T08:15:00Z",
+    "valor": 2.034
+  }
+]

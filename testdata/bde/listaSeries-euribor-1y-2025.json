@@ -1,0 +1,94 @@
+[
+  {
+    "serie": "D_1NBAF472",
+    "descripcion": "Euribor a un año",
+    "descripcionCorta": "Euribor a un año",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "informacion": [
+      {
+        "titulo": "Nombre",
+        "descripcion": "Euribor a un año"
+      },
+      {
+        "titulo": "Descripción",
+        "descripcion": "Tipos de interés. De referencia del mercado hipotecario. Euribor a un año."
+      },
+      {
+        "titulo": "Unidades",
+        "descripcion": "Porcentaje"
+      },
+      {
+        "titulo": "Decimales",
+        "descripcion": "3"
+      },
+      {
+        "titulo": "Número de observaciones",
+        "descripcion": "333"
+      },
+      {
+        "titulo": "Primer valor",
+        "descripcion": "[Ene 1999] 3,062 %"
+      },
+      {
+        "titulo": "Último valor",
+        "descripcion": "[Sep 2026] 3,247 %"
+      },
+      {
+        "titulo": "Valor mínimo",
+        "descripcion": "[Ene 2021] -0,505 %"
+      },
+      {
+        "titulo": "Valor máximo",
+        "descripcion": "[Jul 2008] 5,393 %"
+      },
+      {
+        "titulo": "Fuente",
+        "descripcion": "EURIBOR European Banking Federation\nACI Asociación de Mercados Financieros\nBanco Central Europeo"
+      },
+      {
+        "titulo": "Notas",
+        "descripcion": "Tipo de oferta de los depósitos interbancarios en el área del euro correspondientes a 57 de los bancos más activos del área.\nHasta diciembre de 1998 tipo sintético calculado ponderando los tipos nacionales por el Producto Interior Bruto."
+      },
+      {
+        "titulo": "Series relacionadas (cuadro pdf)",
+        "descripcion": "<a href='https://www.bde.es/webbe/es/estadisticas/compartido/datos/pdf/a1901.pdf'>Descarga el cuadro en formato pdf con series relacionadas</a>"
+      },
+      {
+        "titulo": "Series relacionadas (archivo Excel)",
+        "descripcion": "<a href='https://www.bde.es/webbe/es/estadisticas/compartido/datos/xlsx/be1901.xlsx'>Descarga el archivo Excel con series relacionadas</a>"
+      }
+    ],
+    "fechaInicio": "1999-01-01T09:15:00Z",
+    "fechaFin": "2026-09-01T08:15:00Z",
+    "fechas": [
+      "2025-12-01T09:15:00Z",
+      "2025-11-01T09:15:00Z",
+      "2025-10-01T08:15:00Z",
+      "2025-09-01T08:15:00Z",
+      "2025-08-01T08:15:00Z",
+      "2025-07-01T08:15:00Z",
+      "2025-06-01T08:15:00Z",
+      "2025-05-01T08:15:00Z",
+      "2025-04-01T08:15:00Z",
+      "2025-03-01T09:15:00Z",
+      "2025-02-01T09:15:00Z",
+      "2025-01-01T09:15:00Z"
+    ],
+    "valores": [
+      2.267,
+      2.217,
+      2.187,
+      2.172,
+      2.114,
+      2.079,
+      2.081,
+      2.081,
+      2.143,
+      2.398,
+      2.407,
+      2.525
+    ]
+  }
+]

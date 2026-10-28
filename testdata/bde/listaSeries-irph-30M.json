@@ -1,0 +1,116 @@
+[
+  {
+    "serie": "D_1T9H0000",
+    "descripcion": "TIPOS DE INTERES DE REFERENCIA MERCADO HIPOTECARIO (ORDEN EHA/2899/2011, DE 28 DE OCTUBRE)  MEDIA PONDERADA DEL CONJUNTO DE ENTIDADES",
+    "descripcionCorta": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Más de 3 años. Conjunto EC España",
+    "codFrecuencia": "M",
+    "decimales": 3,
+    "simbolo": "%",
+    "informacion": [
+      {
+        "titulo": "Nombre",
+        "descripcion": "Tipos de interés. De referencia. Oficiales. Mercado hipotecario. Tipo medio adquisición vivienda libre. Más de 3 años. Conjunto EC España"
+      },
+      {
+        "titulo": "Descripción",
+        "descripcion": "TIPOS DE INTERES DE REFERENCIA MERCADO HIPOTECARIO (ORDEN EHA/2899/2011, DE 28 DE OCTUBRE)  MEDIA PONDERADA DEL CONJUNTO DE ENTIDADES"
+      },
+      {
+        "titulo": "Unidades",
+        "descripcion": "Porcentaje"
+      },
+      {
+        "titulo": "Decimales",
+        "descripcion": "3"
+      },
+      {
+        "titulo": "Número de observaciones",
+        "descripcion": "431"
+      },
+      {
+        "titulo": "Primer valor",
+        "descripcion": "[Nov 1990] 16,770 %"
+      },
+      {
+        "titulo": "Último valor",
+        "descripcion": "[Sep 2026] 3,189 %"
+      },
+      {
+        "titulo": "Valor mínimo",
+        "descripcion": "[Nov 2021] 1,412 %"
+      },
+      {
+        "titulo": "Valor máximo",
+        "descripcion": "[Ene 1991] 16,920 %"
+      }
+    ],
+    "fechaInicio": "1990-11-01T09:15:00Z",
+    "fechaFin": "2026-09-01T08:15:00Z",
+    "fechas": [
+      "2026-09-01T08:15:00Z",
+      "2026-08-01T08:15:00Z",
+      "2026-07-01T08:15:00Z",
+      "2026-06-01T08:15:00Z",
+      "2026-05-01T08:15:00Z",
+      "2026-04-01T08:15:00Z",
+      "2026-03-01T09:15:00Z",
+      "2026-02-01T09:15:00Z",
+      "2026-01-01T09:15:00Z",
+      "2025-12-01T09:15:00Z",
+      "2025-11-01T09:15:00Z",
+      "2025-10-01T08:15:00Z",
+      "2025-09-01T08:15:00Z",
+      "2025-08-01T08:15:00Z",
+      "2025-07-01T08:15:00Z",
+      "2025-06-01T08:15:00Z",
+      "2025-05-01T08:15:00Z",
+      "2025-04-01T08:15:00Z",
+      "2025-03-01T09:15:00Z",
+      "2025-02-01T09:15:00Z",
+      "2025-01-01T09:15:00Z",
+      "2024-12-01T09:15:00Z",
+      "2024-11-01T09:15:00Z",
+      "2024-10-01T08:15:00Z",
+      "2024-09-01T08:15:00Z",
+      "2024-08-01T08:15:00Z",
+      "2024-07-01T08:15:00Z",
+      "2024-06-01T08:15:00Z",
+      "2024-05-01T08:15:00Z",
+      "2024-04-01T08:15:00Z",
+      "2024-03-01T09:15:00Z"
+    ],
+    "valores": [
+      3.189,
+      3.134,
+      3.077,
+      3.049,
+      2.986,
+      2.882,
+      2.84,
+      2.819,
+      2.762,
+      2.788,
+      2.807,
+      2.796,
+      2.695,
+      2.791,
+      2.748,
+      2.802,
+      2.852,
+      2.851,
+      2.923,
+      2.872,
+      2.96,
+      3.105,
+      3.206,
+      3.423,
+      3.506,
+      3.671,
+      3.728,
+      3.71,
+      3.861,
+      3.823,
+      3.901
+    ]
+  }
+]
