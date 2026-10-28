@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -46,6 +47,23 @@ func TestScheduleGridProperties(t *testing.T) {
 				}
 				label := p + "·" + r + "%·" + itoa(n)
 				t.Run(label, func(t *testing.T) {
+					// Con un capital de 0.01 y más de un mes la cuota
+					// redondeada a céntimos es 0.00 para cualquier tipo: el
+					// interés del mes también redondea a 0.00 y el préstamo no
+					// progresa nunca. Es el mismo caso degenerado de
+					// ErrUnpayableSchedule. A un mes la última cuota absorbe el
+					// capital en la primera fila y no hay filas sin progreso.
+					if p == "0.01" && n > 1 {
+						sched, err := Amortization(loan)
+						if !errors.Is(err, ErrUnpayableSchedule) {
+							t.Fatalf("err = %v, se esperaba ErrUnpayableSchedule", err)
+						}
+						if len(sched.Rows) != 0 {
+							t.Fatalf("filas = %d, se esperaban 0 junto al error", len(sched.Rows))
+						}
+						return
+					}
+
 					sched := mustAmortization(t, loan)
 
 					if len(sched.Rows) < 1 || len(sched.Rows) > loan.Months {
@@ -248,6 +266,60 @@ func TestCompoundScheduleNegativeRate(t *testing.T) {
 	}
 	if sched.TotalInterest.Sign() >= 0 {
 		t.Errorf("interés total = %s, se esperaba negativo", sched.TotalInterest.String())
+	}
+}
+
+// TestUnpayableScheduleDegenerateCase: con un tipo absurdo de −50 % la cuota
+// redondeada half-up a céntimos es 0.00. Cuando además el interés del mes
+// redondea a 0.00, la amortización mensual es 0.00 y el préstamo nunca se
+// cierra: hoy el cuadro emite filas sin progreso (cuota, interés y
+// amortización 0.00) hasta que la última cuota absorbe el residuo. Un cuadro
+// así no es válido: Amortization debe devolver ErrUnpayableSchedule y ningún
+// cuadro. Se comprueba con errors.Is sobre el sentinel.
+func TestUnpayableScheduleDegenerateCase(t *testing.T) {
+	loan := Loan{
+		Principal:  mustDecimal(t, "150000.00"),
+		AnnualRate: mustDecimal(t, "-50"),
+		Months:     480,
+	}
+	sched, err := Amortization(loan)
+	if err == nil {
+		t.Fatalf("se esperaba error, se obtuvo cuadro con %d filas", len(sched.Rows))
+	}
+	if !errors.Is(err, ErrUnpayableSchedule) {
+		t.Fatalf("err = %v, se esperaba ErrUnpayableSchedule", err)
+	}
+	if len(sched.Rows) != 0 {
+		t.Fatalf("filas = %d, se esperaban 0 junto al error", len(sched.Rows))
+	}
+}
+
+// TestUnpayableScheduleRealisticNegativeCase: el caso negativo realista
+// (Euríbor −0.5 % + diferencial 0.2 % = TIN −0.3 %) no se ve afectado por el
+// sentinel: sigue generando su cuadro completo de 120 filas y cierra a 0.00
+// exacto.
+func TestUnpayableScheduleRealisticNegativeCase(t *testing.T) {
+	loan := Loan{
+		Principal:  mustDecimal(t, "100000.00"),
+		AnnualRate: mustDecimal(t, "-0.30"),
+		Months:     120,
+	}
+	sched := mustAmortization(t, loan)
+
+	if len(sched.Rows) != 120 {
+		t.Fatalf("filas = %d, se esperaban 120", len(sched.Rows))
+	}
+	if !sched.Rows[len(sched.Rows)-1].Balance.IsZero() {
+		t.Errorf("capital final = %s, se esperaba 0 exacto",
+			sched.Rows[len(sched.Rows)-1].Balance.String())
+	}
+	sumPrincipal := decimal.Zero
+	for _, row := range sched.Rows {
+		sumPrincipal = sumPrincipal.Add(row.Principal)
+	}
+	if !sumPrincipal.Equal(loan.Principal) {
+		t.Errorf("suma de amortizaciones = %s, se esperaba el capital %s",
+			sumPrincipal.String(), loan.Principal.String())
 	}
 }
 

@@ -71,15 +71,25 @@ caso de referencia. Lleva verificador independiente.
 
 ## Evidencia de verificación
 
-Se completa al cerrar.
+- **Verificador independiente: PASS**, cero blockers y cero majors. Orden suelo→redondeo
+  demostrado con un caso que lo distingue, redondeo simétrico en los cuatro modos y ambos
+  signos, TIN −5 % cerrando exacto, `CompoundSchedule` coincidente fila a fila con el núcleo
+  encadenado, `ReferenceMonth` bajo cuatro zonas horarias.
+- **Autor**: cuadro con TIN −0,30 % a 120 meses calculado con implementación independiente →
+  cuota 820,79, intereses −1.504,98, cierre 0,00, idéntico. Los diez casos de referencia con
+  `sha256` iguales a `dev`.
+- **Esta ronda**: tipos negativos soportados en el núcleo, redondeo half-up lejos de cero,
+  `ErrUnpayableSchedule` para cuadros sin progreso, y la documentación obsoleta corregida.
+- `bash scripts/check.sh` → exit 0.
 
 ## Progreso
 
-Decisiones fijadas; implementación no iniciada.
+**Cerrada.** Detalle en `odd/reviews/FIN-02.md`.
 
 ## Siguiente paso
 
-Test en rojo contra los casos 6-8, implementación, verificación.
+`CMD-01` (`index list/show/latest`, `revision`, `schedule`, `calc`) puede construirse sobre
+`internal/bde`, `internal/finance` y el contrato de salida. Después `FIN-03` y `FIN-04`.
 
 ## Log
 
