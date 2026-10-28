@@ -2,8 +2,9 @@
 
 - **Cambio:** `docs/series.md`, `internal/bde/series.yaml`, `testdata/bde/` (13 fixtures),
   `odd/tasks/SPIKE-01-series.md`.
-- **Rango revisado:** `dev..a438772` (dos commits: `ccc2e30` documentación, `a438772`
-  fixtures).
+- **Rango revisado:** los tres commits del PR #1 (documentación, fixtures e informe).
+- **Hashes finales en `dev` (tras el merge con rebase):** `9c7095d` documentación,
+  `a708d6c` fixtures, `97400df` este informe.
 - **Riesgo declarado:** medio. Sin ítem de alto riesgo, así que no hubo verificador
   independiente (no aplica la regla de `internal/finance`).
 - **RDD:** `assess` devolvió `nativeRisk: unassessable` con razón
