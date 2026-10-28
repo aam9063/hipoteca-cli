@@ -5,6 +5,12 @@
 *.test
 *.out
 
+# Herramientas locales de análisis (scripts/tools.sh)
+/.bin/
+
+# Basura del propio make check
+*.check.bak
+
 # Cobertura
 *.cover
 coverage.*
