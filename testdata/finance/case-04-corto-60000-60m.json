@@ -1,0 +1,47 @@
+{
+  "id": "case-04-corto-60000-60m",
+  "description": "Plazo corto y tipo alto (6.25 %): cuotas grandes.",
+  "inputs": {
+    "principal": "60000.00",
+    "annual_rate_pct": "6.25",
+    "term_months": 60,
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents"
+  },
+  "expected": {
+    "payment": "1166.96",
+    "total_interest": "10017.30",
+    "total_paid": "70017.30",
+    "first_row": {
+      "month": 1,
+      "payment": "1166.96",
+      "interest": "312.50",
+      "principal_repaid": "854.46",
+      "outstanding_after": "59145.54"
+    },
+    "last_row": {
+      "month": 60,
+      "payment": "1166.66",
+      "interest": "6.04",
+      "principal_repaid": "1160.62",
+      "outstanding_after": "0.00"
+    },
+    "sum_principal_repaid": "60000.00",
+    "final_outstanding": "0.00"
+  },
+  "source": {
+    "generator": "testdata/finance/generate.py",
+    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generated_at": "2026-10-28",
+    "python_version": "3.14.5",
+    "numpy_version": "2.5.4",
+    "numpy_financial_version": "1.1.0",
+    "methods": [
+      "simulación exacta con decimal.Decimal (precisión 50) y redondeo ROUND_HALF_UP a céntimos",
+      "contraste de la cuota de cada tramo con numpy_financial.pmt"
+    ],
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents",
+    "crosscheck_tolerance": "0.01"
+  }
+}

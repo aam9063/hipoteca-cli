@@ -1,0 +1,93 @@
+{
+  "id": "case-10-amortiza-plazo",
+  "description": "Amortización anticipada de 10000.00 tras la cuota 60 en modo reduce-term: misma cuota, menos meses, comisión 0 %.",
+  "inputs": {
+    "principal": "150000.00",
+    "annual_rate_pct": "3.10",
+    "term_months": 300,
+    "early_repayment": {
+      "mode": "reduce-term",
+      "after_month": 60,
+      "amount": "10000.00",
+      "fee_pct": "0",
+      "fee": "0.00",
+      "outstanding_before_event": "128506.54",
+      "outstanding_after_event": "118506.54",
+      "remaining_months_at_event": 240,
+      "payment_after_event": "719.14",
+      "term_months_after_event": 275,
+      "months_saved": 25
+    },
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents"
+  },
+  "expected": {
+    "payment": "719.14",
+    "total_interest": "57739.18",
+    "total_paid": "207739.18",
+    "first_row": {
+      "month": 1,
+      "payment": "719.14",
+      "interest": "387.50",
+      "principal_repaid": "331.64",
+      "outstanding_after": "149668.36"
+    },
+    "last_row": {
+      "month": 275,
+      "payment": "694.82",
+      "interest": "1.79",
+      "principal_repaid": "693.03",
+      "outstanding_after": "0.00"
+    },
+    "sum_principal_repaid": "150000.00",
+    "final_outstanding": "0.00",
+    "sum_principal_repaid_schedule_only": "140000.00",
+    "payment_before_event": "719.14",
+    "event": {
+      "mode": "reduce-term",
+      "after_month": 60,
+      "amount": "10000.00",
+      "fee_pct": "0",
+      "fee": "0.00",
+      "outstanding_before_event": "128506.54",
+      "outstanding_after_event": "118506.54",
+      "remaining_months_at_event": 240,
+      "payment_after_event": "719.14",
+      "term_months_after_event": 275,
+      "months_saved": 25
+    },
+    "row_at_event_month": {
+      "month": 60,
+      "payment": "719.14",
+      "interest": "332.97",
+      "principal_repaid": "386.17",
+      "outstanding_after": "128506.54"
+    },
+    "first_row_after_event": {
+      "month": 61,
+      "payment": "719.14",
+      "interest": "306.14",
+      "principal_repaid": "413.00",
+      "outstanding_after": "118093.54"
+    },
+    "total_interest_without_early_repayment": "65743.56",
+    "interest_saved": "8004.38",
+    "months_saved": 25
+  },
+  "source": {
+    "generator": "testdata/finance/generate.py",
+    "generator_sha256": "500b3b3fe7e9bbeb81ffd9379d967f584fda9a7c22af41e7743dcbc5b13d9aa6",
+    "generated_at": "2026-10-28",
+    "python_version": "3.14.5",
+    "numpy_version": "2.5.4",
+    "numpy_financial_version": "1.1.0",
+    "methods": [
+      "simulación exacta con decimal.Decimal (precisión 50) y redondeo ROUND_HALF_UP a céntimos",
+      "contraste de la cuota de cada tramo con numpy_financial.pmt",
+      "verificación de que el plazo resultante es el mínimo que cierra el préstamo con la cuota mantenida (numpy_financial.pmt)"
+    ],
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents",
+    "crosscheck_tolerance": "0.01"
+  }
+}
