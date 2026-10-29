@@ -61,7 +61,46 @@ No hay `hipoteca config` todavía, así que **el sink se declara editando el TOM
 `hint` de `watch add` muestra exactamente qué escribir. Es un hueco real de usabilidad que
 corresponde a un comando de config, no a esta tarea.
 
+## Verificador independiente: PASS WITH FIXES
+
+Revisó con probes propios, incluido un servidor que responde redirecciones. Confirmó:
+
+- **La privacidad por defecto resiste incluso en los reintentos**: sin `--with-impact` el payload
+  no lleva ni el id del préstamo, ni el pago, ni el bloque `impact`, ni siquiera con `ImpactFor`
+  cableado.
+- **Un evento por mes**: repetir el check da 0, un valor revisado da 0, un mes nuevo da exactamente
+  1. Dos vigilancias sobre el mismo índice son imposibles por diseño (`UNIQUE(kind,target)`).
+- **El sink caído conserva el evento** y lo reentrega una sola vez.
+- Timeout de 15 s verificado con un servidor lento; `ftp://` y `file://` rechazados; sin cabeceras
+  de credenciales.
+
+### Blocker de seguridad encontrado: el redirect reenviaba los datos
+
+Un sink que responde **307/308** hacía que Go **re-POSTeara el payload completo** —con `loan` y
+`payment`— **a otro host**, y `Deliver` devolvía éxito. Eso rompe la garantía de la tarea: sólo el
+sink que el usuario configuró recibe datos, y encima la CLI decía que todo había salido bien.
+
+Corregido con `CheckRedirect` → `http.ErrUseLastResponse`: un 3xx es la respuesta final, no es 2xx,
+da `upstream_unavailable`/5 y el evento queda para reintento. El test nuevo levanta dos servidores
+y asserta que **el segundo recibe cero bytes**.
+
+### Los otros tres
+
+| Hallazgo | Corrección |
+|---|---|
+| **Major**: `deliver` usaba `context.Background()`, así que `Ctrl+C` no cortaba una entrega en curso | El contexto del llamador baja hasta `Deliver`; `ctx.Err()` mapea a `cancelled`/2 |
+| **Minor**: ninguna base externa se rechazaba — una SQLite ajena o de esquema futuro se adoptaba en silencio | `PRAGMA user_version`: la 1 se acepta, una mayor o una base con tablas y versión 0 se rechazan nombrando el archivo |
+| **Minor**: la URL del sink se ecoaba en los errores, incluida `https://user:token@host` | `redactedURL` (usuario → `redacted`, host y ruta se mantienen) y el detalle del transporte se desenvuelve para no arrastrar la URL |
+
+## Verificación del autor sobre la corrección
+
+`bash scripts/check.sh` → **EXIT=0**. Los seis tests de la ronda en verde:
+`TestWebhookNoSigueRedireccionesConElPayload`, `TestWebhookContextoCanceladoAborta`,
+`TestWebhookErroresConLaURLCensurada`, `TestOpenFijaLaVersionDeEsquemaEnBaseNueva`,
+`TestOpenRechazaVersionDeEsquemaMasNueva` y `TestOpenRechazaSQLiteAjenoSinVersion`.
+
 ## Veredicto
 
-**PASS** con la verificación del autor. Pendiente el verificador independiente formal, que es el
-que debe atacar el payload con `--with-impact` y el reintento de eventos.
+**PASS tras la ronda única de correcciones.** El aviso no lleva datos del préstamo sin pedirlo
+explícitamente, ningún host distinto del configurado los recibe, y una base ajena no se adopta en
+silencio.
