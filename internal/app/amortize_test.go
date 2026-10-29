@@ -274,13 +274,33 @@ func TestAmortizeImporteQueAgotaElSaldoCierraPorElEvento(t *testing.T) {
 			if got := out.BalanceAfter.Decimal().StringFixed(2); got != "0.00" {
 				t.Errorf("balance_after_event = %s, se esperaba 0.00", got)
 			}
-			// El marcador debe llegar al JSON con su nombre del contrato.
+			// El marcador debe llegar al JSON con su nombre del contrato y con
+			// las cifras de dinero a dos decimales: "0" sin céntimos no es una
+			// cifra de dinero de este contrato (verificador, minor 1).
 			data, err := json.Marshal(res)
 			if err != nil {
 				t.Fatalf("marshal: %v", err)
 			}
 			if !strings.Contains(string(data), `"closes_at_event"`) {
 				t.Errorf("el JSON debe llevar closes_at_event:\n%s", data)
+			}
+			for _, campo := range []string{
+				`"balance_after_event":"0.00"`,
+				`"fee":"0.00"`,
+				`"interest_saved":`,
+			} {
+				if !strings.Contains(string(data), campo) {
+					t.Errorf("el JSON debe llevar %s a dos decimales:\n%s", campo, data)
+				}
+			}
+			// payment_after en el JSON: reduce-payment 0.00 (no hay cuota que
+			// recalcular); reduce-term la cuota mantenida del mes del evento.
+			wantJSONPayment := `"payment_after":"0.00"`
+			if mode == "reduce-term" {
+				wantJSONPayment = `"payment_after":"719.14"`
+			}
+			if !strings.Contains(string(data), wantJSONPayment) {
+				t.Errorf("el JSON debe llevar %s:\n%s", wantJSONPayment, data)
 			}
 		})
 	}
@@ -385,6 +405,11 @@ func TestAmortizeErroresDeEntradaSonUsage(t *testing.T) {
 			}
 			if strings.TrimSpace(e.Message) == "" {
 				t.Error("el mensaje debe explicar qué entrada es inválida")
+			}
+			// El prefijo del paquete interno no es lenguaje de usuario (verificador,
+			// nit 3): el mensaje lleva el hecho y el hint lleva la guía.
+			if strings.Contains(e.Message, "finance:") {
+				t.Errorf("el mensaje no debe filtrar el prefijo interno \"finance:\": %s", e.Message)
 			}
 		})
 	}
