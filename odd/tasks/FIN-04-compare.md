@@ -88,3 +88,18 @@ La comparación no puede exigir el índice de meses futuros: se detiene en el ú
 publicado en los dos índices, `--to` posterior a los publicados es usage/2, y la cobertura
 se declara con aviso de no proyección (P-06). Un hueco dentro del periodo publicado sigue
 siendo index_not_published/4 (decisión 2).
+
+### L3 · 2026-10-29 · verificador: PASS WITH FIXES, dos majors
+
+El advisory de LOAN-01 del L1 previo fue un error de alcance del usuario: un préstamo
+FIJO no tiene revisiones de tipo, así que dejarlo pasar calculaba una revisión fabricada.
+Corregido:
+
+- `revision` sobre un fijo es usage/2 nombrando el tipo del contrato y apuntando a
+  `schedule`/`amortize`; no calcula nada (major 1).
+- `compare` sobre un fijo se mantiene (es responder "¿qué habría pasado si hubiera sido
+  variable?") pero el bloque propio va marcado assumed y la salida avisa de que es una
+  recomposición hipotética, no su historia (P-06) (major 2).
+- Menores: el mensaje de "no hay revisiones comparables" nombra el primer mes de
+  referencia que falta; el `--help` declara el signo de la diferencia (alternativa −
+  propia) y que `--to` acota también el cálculo y los totales.

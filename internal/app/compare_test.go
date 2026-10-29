@@ -449,8 +449,48 @@ func TestCompareSinNingunaRevisionPublicada(t *testing.T) {
 		Now:        ahoraFijo(),
 	})
 	e := assertAppError(t, err, errs.KindUsage, 2)
-	if !containsAll(e.Message, "ninguna revisión") {
-		t.Fatalf("el mensaje debe decir que no hay revisiones comparables: %q", e.Message)
+	if !containsAll(e.Message, "ninguna revisión", "2027-04") {
+		t.Fatalf("el mensaje debe decir que no hay revisiones comparables y nombrar el primer mes que falta: %q", e.Message)
+	}
+}
+
+// TestCompareFijaEsHipotesis: un préstamo fijo no tiene revisiones de tipo,
+// así que comparar es responder "¿qué habría pasado si hubiera sido
+// variable?": el bloque propio va marcado assumed y la salida avisa de que
+// es una recomposición hipotética, no su historia (verificador de FIN-04,
+// major 2).
+func TestCompareFijaEsHipotesis(t *testing.T) {
+	l := prestamoCompare()
+	l.Type = loan.TypeFija
+	path := configCon(t, map[string]loan.Loan{"casa": l})
+	rt := runtimeCompare(t)
+
+	res, err := Compare(t.Context(), rt, CompareParams{
+		ConfigPath: path,
+		LoanID:     "casa",
+		Index:      "irph",
+		Spread:     "1.00",
+		Now:        ahoraFijo(),
+	})
+	if err != nil {
+		t.Fatalf("Compare() de un préstamo fijo: %v", err)
+	}
+	if len(res.Own.Revisions) == 0 {
+		t.Fatal("la comparación de un fijo debe seguir trayendo el bloque propio")
+	}
+	for _, rev := range res.Own.Revisions {
+		if !rev.Assumed {
+			t.Fatalf("las revisiones del bloque propio de un fijo deben ser assumed: %+v", rev)
+		}
+	}
+	// El alternativo queda como esté: el IRPH de la serie es real.
+	for _, rev := range res.Alternative.Revisions {
+		if rev.Assumed {
+			t.Fatalf("el bloque alternativo no debe marcarse assumed si su serie es real: %+v", rev)
+		}
+	}
+	if len(res.Warnings) != 1 || !containsAll(res.Warnings[0], "fijo", "hipot", "P-06") {
+		t.Fatalf("warnings = %v, want el aviso de recomposición hipotética (P-06)", res.Warnings)
 	}
 }
 

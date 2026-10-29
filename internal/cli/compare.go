@@ -26,6 +26,11 @@ La comparación es sobre el pasado: cubre hasta la última revisión cuyo mes de
 referencia está publicado en los dos índices, y lo declara en coverage. Si el
 plazo sigue más allá, la salida lo avisa: el resto del plazo no se proyecta.
 
+La diferencia es siempre alternativa − propia: una diferencia positiva significa
+que con el índice alternativo se habría pagado más que con el propio. Con un
+préstamo fijo el bloque propio es una recomposición hipotética y va marcado
+como assumed: un fijo no tiene revisiones de tipo.
+
 Con un préstamo guardado (su id, o el único guardado), el capital, el plazo, el
 tramo inicial, el suelo y el redondeo salen del préstamo: --index y --spread son
 el índice alternativo y su diferencial. Sin préstamo guardado, el cálculo es un
@@ -166,7 +171,7 @@ interpola ni inventa valores. La salida compara, no recomienda.`,
 	cmd.Flags().String("index", "", "id del índice alternativo con el que comparar, p. ej. irph")
 	cmd.Flags().String("spread", "", "diferencial del índice alternativo en tanto por ciento, p. ej. 1.00")
 	cmd.Flags().String("from", "", "mes desde el que se muestran y comparan las revisiones, YYYY-MM, p. ej. 2025-01 (el recálculo y los totales empiezan siempre en el inicio del préstamo)")
-	cmd.Flags().String("to", "", "mes hasta el que se muestran y comparan las revisiones, YYYY-MM, p. ej. 2026-01; no puede ser posterior al último mes publicado: la comparación sólo cubre meses publicados")
+	cmd.Flags().String("to", "", "mes hasta el que se comparan las revisiones, YYYY-MM, p. ej. 2026-01: acota también el cálculo y los totales, que corren hasta la revisión siguiente a la última comparada; no puede ser posterior al último mes publicado: la comparación sólo cubre meses publicados")
 	cmd.Flags().String("index-values", "", "valores del índice supuestos, separados por comas: uno por revisión con préstamo guardado, o uno por periodo de 12 meses sin él, p. ej. 2.0,2.2 (cada uno se marca assumed)")
 	cmd.Flags().String("principal", "", "capital en euros, p. ej. 150000.00 (sólo sin préstamo guardado)")
 	cmd.Flags().Int("months", 0, "plazo total en meses, p. ej. 240 (sólo sin préstamo guardado)")
