@@ -111,6 +111,12 @@ subsidio no devengado (el interés a favor que el cuadro intacto ganaría en la 
 ventana y en los meses que vive de más). Nunca se recorta a cero: la cifra con signo es
 la que explica al usuario qué ha pasado con su dinero.
 
+**Si el importe agota el capital pendiente, el cuadro cierra por el propio evento.** La
+última fila es la del mes del evento y lleva el capital anterior a él; el cierre en 0.00
+exacto queda expresado por el saldo tras el evento y el plazo resultante, y el total
+pagado del cuadro no incluye el desembolso de la amortización (importe + comisión). La
+capa de comando (CMD-02) debe presentar el evento como una línea propia en ese caso.
+
 ### 1.6 Tolerancia de cierre
 
 El capital final del cuadro es exactamente `0.00` por diseño (convención 1.3). La

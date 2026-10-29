@@ -96,7 +96,12 @@ type Prepayment struct {
 	// Schedule es el cuadro completo con el evento aplicado: las filas
 	// 1..AfterMonth son las del préstamo original y las siguientes las del
 	// tramo recalculado, renumeradas de forma continua hasta el cierre en
-	// exactamente 0.00.
+	// exactamente 0.00. Excepción M1 (importe que agota el saldo): el cuadro
+	// cierra POR EL PROPIO EVENTO — la última fila es la del mes del evento y
+	// lleva el capital anterior al evento, BalanceAfter queda en 0.00 exacto,
+	// TermAfter es el mes del evento, y Schedule.TotalPaid NO incluye el
+	// desembolso (importe + comisión). La capa de comando (CMD-02) debe
+	// presentar el evento explícitamente en ese caso.
 	Schedule Schedule
 }
 
@@ -109,6 +114,12 @@ type Prepayment struct {
 //
 // La comisión es round_half_up(Amount · FeePct / 100); el desembolso del
 // usuario es Amount + Fee y el saldo baja exactamente por Amount (decisión 1).
+//
+// M1 (importe que agota el saldo): el préstamo cierra por el propio evento.
+// El Schedule devuelto termina en la fila del mes del evento, que lleva el
+// capital anterior al evento; el cierre en 0.00 exacto queda expresado por
+// BalanceAfter y TermAfter (= rep.AfterMonth), y Schedule.TotalPaid no incluye
+// el desembolso: CMD-02 debe renderizar el evento como línea propia.
 //
 // En ReduceTerm se mantiene la cuota y el plazo es el número de meses que la
 // cierran; el interés mensual se redondea igual que en Amortization y la
