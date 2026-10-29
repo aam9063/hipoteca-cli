@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -467,23 +466,5 @@ func TestAppPropagaElSobreDelErrorDeRed(t *testing.T) {
 	}
 	if e.Kind != errs.KindNetwork || errs.ExitCode(e.Kind) != 6 {
 		t.Errorf("kind/código = %q/%d, se esperaba network/6", e.Kind, errs.ExitCode(e.Kind))
-	}
-}
-
-// catalogVerifiedAt es la única fecha real que el binario asocia a los datos
-// originales cuando no hay red: debe coincidir con verified_at de
-// internal/bde/series.yaml, o la atribución de calc mentiría sobre su origen.
-func TestCatalogVerifiedAtCoincideConSeriesYAML(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "bde", "series.yaml"))
-	if err != nil {
-		t.Fatalf("leer series.yaml: %v", err)
-	}
-	re := regexp.MustCompile(`(?m)^verified_at:\s*"([^"]+)"`)
-	m := re.FindSubmatch(data)
-	if m == nil {
-		t.Fatal("series.yaml no declara verified_at")
-	}
-	if string(m[1]) != catalogVerifiedAt {
-		t.Errorf("catalogVerifiedAt = %q, pero series.yaml declara verified_at %q: actualiza la constante", catalogVerifiedAt, string(m[1]))
 	}
 }

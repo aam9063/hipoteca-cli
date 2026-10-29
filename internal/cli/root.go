@@ -23,16 +23,25 @@ type BuildInfo struct {
 // construir el árbol: un fallo de configuración es un error del contrato del
 // comando, no un panic al arrancar. El campo nil usa las de producción
 // (app.NewRuntime); los tests inyectan una función propia para no tocar la red.
+// Version es la versión del binario que la producción pasa a app.NewRuntime
+// para el User-Agent ante el Banco; NewRootCmdWithDeps la rellena desde
+// BuildInfo cuando llega vacía.
 type Deps struct {
 	Runtime func() (*app.Runtime, error)
+	Version string
 }
+
+// newRuntime es la construcción de producción del runtime; es una variable
+// para que los tests del cableado capturen la versión que llega a
+// app.NewRuntime sin tocar configuración ni red.
+var newRuntime = app.NewRuntime
 
 // runtime resuelve el runtime para la petición en vuelo.
 func (d Deps) runtime() (*app.Runtime, error) {
 	if d.Runtime != nil {
 		return d.Runtime()
 	}
-	return app.NewRuntime()
+	return newRuntime(d.Version)
 }
 
 // NewRootCmd builds the command tree with the production dependencies. It returns a
@@ -43,6 +52,11 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 
 // NewRootCmdWithDeps builds the command tree over the given dependencies.
 func NewRootCmdWithDeps(info BuildInfo, deps Deps) *cobra.Command {
+	// La versión inyectada llega al runtime (y de ahí al User-Agent del
+	// cliente del Banco) salvo que las dependencias traigan una explícita.
+	if deps.Version == "" {
+		deps.Version = info.Version
+	}
 	root := &cobra.Command{
 		Use:   "hipoteca",
 		Short: "Índices oficiales del Banco de España y cálculos de tu hipoteca",
