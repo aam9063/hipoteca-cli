@@ -108,7 +108,7 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		},
 	}
 
-	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps))
+	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.

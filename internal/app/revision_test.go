@@ -272,6 +272,58 @@ func TestRevisionCapitalSinCobertura(t *testing.T) {
 	assertAppError(t, err, errs.KindUsage, 2)
 }
 
+// TestRevisionFijaSinSync: un préstamo fijo sin recibo sincronizado se puede
+// revisar en cualquier fecha dentro del plazo (advisory de LOAN-01): su cuadro
+// es exacto porque el tipo no cambia, así que el capital pendiente sale del
+// cuadro propio sin inventar nada.
+func TestRevisionFijaSinSync(t *testing.T) {
+	l := prestamoCompleto()
+	l.Type = loan.TypeFija // sin sync
+	path := configCon(t, map[string]loan.Loan{"casa": l})
+	rt := runtimeRevision(t)
+
+	// Mes 24: dos revisiones después del tramo inicial; en un variable esto
+	// se rechaza, en un fijo el cuadro propio manda.
+	res, err := Revision(t.Context(), rt, RevisionParams{
+		ConfigPath: path,
+		LoanID:     "casa",
+		Date:       "2023-06",
+		Now:        ahoraFijo(),
+	})
+	if err != nil {
+		t.Fatalf("Revision() de un préstamo fijo sin sync: %v", err)
+	}
+	if res.Inputs.OutstandingSource != "schedule" {
+		t.Fatalf("outstanding_source = %q, want schedule", res.Inputs.OutstandingSource)
+	}
+	if res.Inputs.RemainingMonths != 336 {
+		t.Fatalf("remaining_months = %d, want 336", res.Inputs.RemainingMonths)
+	}
+	cuadro, err := finance.Amortization(finance.Loan{
+		Principal:  decimal.RequireFromString("180000"),
+		AnnualRate: decimal.RequireFromString("1.25"),
+		Months:     360,
+	})
+	if err != nil {
+		t.Fatalf("cuadro propio: %v", err)
+	}
+	if !res.Inputs.OutstandingPrincipal.Decimal().Equal(cuadro.Rows[23].Balance) {
+		t.Fatalf("outstanding = %s, want %s (el pendiente tras la cuota 24)",
+			res.Inputs.OutstandingPrincipal, cuadro.Rows[23].Balance)
+	}
+	if !res.Payment.Previous.Decimal().Equal(cuadro.Rows[0].Payment) {
+		t.Fatalf("payment.previous = %s, want la cuota del cuadro %s", res.Payment.Previous, cuadro.Rows[0].Payment)
+	}
+	// La cadena del tipo sigue siendo la del préstamo: Euríbor de 2023-04
+	// (referencia de 2023-06 con offset 2) + diferencial.
+	if res.Index.ReferenceMonth != "2023-04" || res.Index.Value.String() != "3.757" {
+		t.Fatalf("index = %s/%s, want 2023-04/3.757", res.Index.ReferenceMonth, res.Index.Value)
+	}
+	if res.Rate.Raw.String() != "4.647" {
+		t.Fatalf("rate.raw = %s, want 4.647 (3.757 + 0.89)", res.Rate.Raw)
+	}
+}
+
 // TestRevisionProximaReviscion: sin --date, la revisión es la primera
 // posterior al mes en curso.
 func TestRevisionProximaReviscion(t *testing.T) {

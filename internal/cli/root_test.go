@@ -220,21 +220,17 @@ func TestLaVersionInyectadaLlegaAlCliente(t *testing.T) {
 }
 
 // CMD-02: `amortize` y `scenario` están en el árbol (piden sus banderas con un
-// error de uso, no con "subcomando desconocido") y `compare` NO está expuesto:
-// depende de FIN-04 y no se expone un comando que no puede cumplir (L1).
-func TestAmortizeYScenarioRegistradosYCompareNoExpuesto(t *testing.T) {
+// error de uso, no con "subcomando desconocido"); FIN-04 expone `compare` con
+// el mismo contrato: registrado, responde con un error de uso, no con
+// "subcomando desconocido" (L1).
+func TestAmortizeYScenarioYCompareRegistrados(t *testing.T) {
 	deps := depsCon(t, &stubSource{})
-	for _, args := range [][]string{{"amortize"}, {"scenario"}} {
+	for _, args := range [][]string{{"amortize"}, {"scenario"}, {"compare"}} {
 		_, _, err := runRoot(t, deps, args...)
 		e := assertContractError(t, err, errs.KindUsage, 2)
 		if strings.Contains(e.Message, "subcomando desconocido") {
 			t.Errorf("%q debe estar registrado en el árbol; el error dice: %s", args[0], e.Message)
 		}
-	}
-	_, _, err := runRoot(t, deps, "compare")
-	e := assertContractError(t, err, errs.KindUsage, 2)
-	if !strings.Contains(e.Message, "subcomando desconocido") {
-		t.Errorf("compare no debe estar expuesto; el error dice: %s", e.Message)
 	}
 }
 
