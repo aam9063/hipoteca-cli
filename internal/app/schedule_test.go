@@ -73,8 +73,9 @@ func TestScheduleDesdeCaso01(t *testing.T) {
 	if res.TotalInterest.String() != "65743.56" || res.TotalPaid.String() != "215743.56" {
 		t.Fatalf("totales = %s/%s, want 65743.56/215743.56", res.TotalInterest, res.TotalPaid)
 	}
-	if len(res.Warnings) != 0 {
-		t.Fatalf("warnings = %v, want vacío (préstamo fijo)", res.Warnings)
+	// §5.2: sin avisos, warnings es una lista vacía, no null.
+	if res.Warnings == nil || len(res.Warnings) != 0 {
+		t.Fatalf("warnings = %v, want [] (lista vacía, no null; préstamo fijo)", res.Warnings)
 	}
 	if res.Attribution.NotEndorsed != true ||
 		res.Attribution.Text != "Elaboración propia con datos extraídos del sitio web del Banco de España (www.bde.es)" {
@@ -144,8 +145,8 @@ func TestScheduleDesdeSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Schedule(): %v", err)
 	}
-	if len(res.Warnings) != 0 {
-		t.Fatalf("warnings = %v, want vacío (el recibo manda)", res.Warnings)
+	if res.Warnings == nil || len(res.Warnings) != 0 {
+		t.Fatalf("warnings = %v, want [] (lista vacía, no null; el recibo manda)", res.Warnings)
 	}
 	if res.Months != 296 || len(res.Rows) != 296 {
 		t.Fatalf("cuadro = %d filas, want 296 (360 - 64 meses desde el recibo)", res.Months)

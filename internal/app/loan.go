@@ -232,26 +232,28 @@ func LoanEdit(path, id string, apply func(*loan.Loan)) error {
 	return cfg.Save(path)
 }
 
-// LoanRemove borra el préstamo del id guardado. Sin confirmación explícita
-// no toca nada y responde confirmation_required/2 (decisión 3 de LOAN-01):
-// borrar el préstamo es irreversible sobre datos del usuario.
-func LoanRemove(path, id string, confirm bool) error {
+// LoanRemove borra el préstamo del id guardado. El id se resuelve igual que
+// en show, sync, revision y schedule (LOAN-01.4): con un único préstamo,
+// omitirlo es válido. Sin confirmación explícita no toca nada y responde
+// confirmation_required/2 (decisión 3 de LOAN-01): borrar el préstamo es
+// irreversible sobre datos del usuario. Devuelve el id resuelto que se ha
+// borrado.
+func LoanRemove(path, idOrEmpty string, confirm bool) (string, error) {
 	cfg, err := loadConfigAt(path)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if _, ok := cfg.Loans[id]; !ok {
-		return errs.New(errs.KindNotFound,
-			fmt.Sprintf("no hay ningún préstamo guardado con el id %q", id),
-			"\"hipoteca loan list\" muestra los préstamos guardados")
+	id, err := resolveLoanID(cfg.Loans, idOrEmpty)
+	if err != nil {
+		return "", err
 	}
 	if !confirm {
-		return errs.New(errs.KindConfirmationRequired,
+		return "", errs.New(errs.KindConfirmationRequired,
 			fmt.Sprintf("borrar el préstamo %q es irreversible: no se ha borrado nada", id),
 			"vuelve a lanzar el comando con --yes para confirmar el borrado")
 	}
 	delete(cfg.Loans, id)
-	return cfg.Save(path)
+	return id, cfg.Save(path)
 }
 
 // LoanSync guarda la sincronización con el recibo real: fecha, capital

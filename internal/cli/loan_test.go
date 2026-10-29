@@ -246,5 +246,71 @@ func loanCompletaParaE2E() loan.Loan {
 	}
 }
 
+// TestE2EEditCambiaUnCampo: `loan edit` cambia sólo la bandera que llega
+// sobre el préstamo ya guardado y valida el préstamo FUSIONADO: con un
+// préstamo completo, editar un campo sin repetir el resto funciona (el hint
+// de loan_incomplete lo anuncia así) y el cambio queda en la config. Una
+// bandera inválida sobre el resultado fusionado sigue fallando con usage/2
+// nombrando el campo, sin tocar la config.
+func TestE2EEditCambiaUnCampo(t *testing.T) {
+	deps := depsConConfig(t, &stubSource{}, seedLoan(t, "casa"))
+
+	stdout, stderr, err := runRoot(t, deps, "loan", "edit", "casa", "--reference-offset-months", "4")
+	if err != nil {
+		t.Fatalf("loan edit de un campo sobre un préstamo completo: %v (stderr: %s)", err, stderr)
+	}
+	assertSingleJSON(t, stdout)
+	if !strings.Contains(stdout, `"reference_offset_months":4`) {
+		t.Fatalf("la salida de edit debe reflejar el campo cambiado:\n%s", stdout)
+	}
+	// El cambio queda en la config y el resto del préstamo no se toca.
+	stdout, _, err = runRoot(t, deps, "loan", "show", "casa")
+	if err != nil || !strings.Contains(stdout, `"reference_offset_months":4`) ||
+		!strings.Contains(stdout, `"spread":"0.89"`) {
+		t.Fatalf("el cambio debía quedar en la config: %s (%v)", stdout, err)
+	}
+
+	// Una bandera inválida: usage/2 nombrando el campo, y la config se
+	// queda como estaba.
+	_, _, err = runRoot(t, deps, "loan", "edit", "casa", "--type", "flotante")
+	e := assertContractError(t, err, errs.KindUsage, 2)
+	if !strings.Contains(e.Message, "flotante") {
+		t.Fatalf("el error debe nombrar el campo y el valor: %q", e.Message)
+	}
+	stdout, _, err = runRoot(t, deps, "loan", "show", "casa")
+	if err != nil || !strings.Contains(stdout, `"type":"variable"`) {
+		t.Fatalf("una edición rechazada no debe cambiar la config: %s (%v)", stdout, err)
+	}
+}
+
+// TestE2ERemoveIdOpcional: con un único préstamo, `loan remove --yes` sin id
+// borra ése (LOAN-01.4); con varios préstamos y sin id, usage/2 listando los
+// ids. Sin --yes nada se borra (decisión 3 de LOAN-01).
+func TestE2ERemoveIdOpcional(t *testing.T) {
+	deps := depsConConfig(t, &stubSource{}, seedLoan(t, "casa"))
+
+	stdout, _, err := runRoot(t, deps, "loan", "remove", "--yes")
+	if err != nil {
+		t.Fatalf("loan remove --yes sin id y un préstamo: %v", err)
+	}
+	assertSingleJSON(t, stdout)
+	if !strings.Contains(stdout, `"loan":"casa"`) || !strings.Contains(stdout, `"removed":true`) {
+		t.Fatalf("remove debía borrar casa: %s", stdout)
+	}
+	_, _, err = runRoot(t, deps, "loan", "show")
+	assertContractError(t, err, errs.KindNotFound, 4)
+
+	for _, id := range []string{"casa", "piso"} {
+		if _, _, err := runRoot(t, deps, append([]string{"loan", "add", id}, flagsCasa()...)...); err != nil {
+			t.Fatalf("loan add %s: %v", id, err)
+		}
+	}
+	_, _, err = runRoot(t, deps, "loan", "remove", "--yes")
+	e := assertContractError(t, err, errs.KindUsage, 2)
+	if !strings.Contains(e.Message, "casa") || !strings.Contains(e.Message, "piso") {
+		t.Fatalf("el error debe listar los ids: %q", e.Message)
+	}
+}
+
 // assertSingleJSON ya está definido en index_test.go (mismo paquete): un
 // único valor JSON terminado en salto de línea.
