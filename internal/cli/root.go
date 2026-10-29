@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/aam9063/hipoteca-cli/internal/app"
+	"github.com/aam9063/hipoteca-cli/internal/config"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/spf13/cobra"
 )
@@ -25,10 +26,14 @@ type BuildInfo struct {
 // (app.NewRuntime); los tests inyectan una función propia para no tocar la red.
 // Version es la versión del binario que la producción pasa a app.NewRuntime
 // para el User-Agent ante el Banco; NewRootCmdWithDeps la rellena desde
-// BuildInfo cuando llega vacía.
+// BuildInfo cuando llega vacía. ConfigPath es la ruta de la config local para
+// los comandos de préstamos (LOAN-01): la producción resuelve
+// config.ConfigPath y los tests inyectan una temporal, de modo que ningún
+// test lee la config del usuario.
 type Deps struct {
-	Runtime func() (*app.Runtime, error)
-	Version string
+	Runtime    func() (*app.Runtime, error)
+	ConfigPath func() (string, error)
+	Version    string
 }
 
 // newRuntime es la construcción de producción del runtime; es una variable
@@ -42,6 +47,15 @@ func (d Deps) runtime() (*app.Runtime, error) {
 		return d.Runtime()
 	}
 	return newRuntime(d.Version)
+}
+
+// configPath resuelve la ruta de la config local (sólo resolución de ruta,
+// sin acceso a ficheros: leerla y escribirla es de internal/app).
+func (d Deps) configPath() (string, error) {
+	if d.ConfigPath != nil {
+		return d.ConfigPath()
+	}
+	return config.ConfigPath()
 }
 
 // NewRootCmd builds the command tree with the production dependencies. It returns a
@@ -94,7 +108,7 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		},
 	}
 
-	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(), newScenarioCmd(), newRevisionCmd(), newScheduleCmd())
+	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.

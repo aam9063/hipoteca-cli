@@ -3,8 +3,11 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 )
 
 // writeBytes writes b to a new file under dir and returns its path.
@@ -155,5 +158,154 @@ func TestSaveRejectsUnsupportedSchemaVersion(t *testing.T) {
 	}
 	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
 		t.Fatal("Save() with an unsupported version left a file behind")
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Sección [loans.<id>] (LOAN-01.2): la misma escritura atómica de CORE-02,
+// con el modelo de internal/loan.
+// ----------------------------------------------------------------------------
+
+// prestamoCasa devuelve el préstamo del ejemplo de docs/ARRANQUE.md §4.1,
+// completo, para las pruebas de ida y vuelta.
+func prestamoCasa() loan.Loan {
+	initialPeriod := 12
+	offset := 2
+	sinSuelo := ""
+	return loan.Loan{
+		Name:                  "Casa",
+		Type:                  loan.TypeVariable,
+		StartDate:             "2021-06-01",
+		OriginalPrincipal:     "180000.00",
+		TermMonths:            360,
+		PaymentDay:            1,
+		InitialRate:           "1.25",
+		InitialPeriodMonths:   &initialPeriod,
+		Index:                 "euribor-1y",
+		Spread:                "0.89",
+		SpreadUnbonified:      "1.39",
+		RevisionEveryMonths:   12,
+		ReferenceOffsetMonths: &offset,
+		FloorRate:             &sinSuelo,
+		RateRounding:          "none",
+		InterestConvention:    loan.InterestConventionMonthlyNominal,
+		PaymentRounding:       loan.PaymentRoundingHalfUpCents,
+		EarlyRepaymentFeePct:  "0",
+	}
+}
+
+// equalLoans compara dos préstamos campo a campo, incluidos los punteros.
+func equalLoans(t *testing.T, want, got loan.Loan) {
+	t.Helper()
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("el préstamo cambió en la ida y vuelta:\nwant %+v\ngot  %+v", want, got)
+	}
+}
+
+// TestLoadParsesLoansSection: un TOML escrito a mano con la forma del
+// arranque (§4.1, [loans.<id>] con sync anidado) se lee en cfg.Loans. Fija el
+// formato del archivo: claves snake_case, floor_rate vacío = sin suelo y
+// sync como tabla anidada.
+func TestLoadParsesLoansSection(t *testing.T) {
+	tomlText := `schema_version = 1
+
+[indices]
+euribor1y = "SECUENCIA_TIPO_INTERES_1"
+
+[loans.casa]
+name = "Casa"
+type = "variable"
+start_date = "2021-06-01"
+original_principal = "180000.00"
+term_months = 360
+payment_day = 1
+initial_rate = "1.25"
+initial_period_months = 12
+index = "euribor-1y"
+spread = "0.89"
+spread_unbonified = "1.39"
+revision_every_months = 12
+reference_offset_months = 2
+floor_rate = ""
+rate_rounding = "none"
+interest_convention = "monthly-nominal"
+payment_rounding = "half-up-cents"
+early_repayment_fee_pct = "0"
+
+[loans.casa.sync]
+date = "2026-10-01"
+outstanding_principal = "152341.18"
+current_rate = "3.12"
+`
+	path := writeBytes(t, t.TempDir(), "config.toml", []byte(tomlText))
+
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(got.Indices) != 1 {
+		t.Fatalf("Indices = %v: la sección loans no debe pisar las demás", got.Indices)
+	}
+	if len(got.Loans) != 1 {
+		t.Fatalf("Loans = %v, want un préstamo casa", got.Loans)
+	}
+	l, ok := got.Loans["casa"]
+	if !ok {
+		t.Fatalf("no está el préstamo casa: %v", got.Loans)
+	}
+	want := prestamoCasa()
+	want.Sync = &loan.Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+	equalLoans(t, want, l)
+}
+
+// TestSaveLoadRoundTripLoans: guardar y volver a leer conserva la sección de
+// préstamos campo a campo, incluidos floor_rate = "" (sin suelo explícito),
+// los punteros a cero (offset 0) y un préstamo sin sync (LOAN-01.2).
+func TestSaveLoadRoundTripLoans(t *testing.T) {
+	offsetCero := 0
+	tramoCero := 0
+	for name, l := range map[string]loan.Loan{
+		"completo con sync": func() loan.Loan {
+			l := prestamoCasa()
+			l.Sync = &loan.Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+			return l
+		}(),
+		"offset cero y sin suelo": func() loan.Loan {
+			l := prestamoCasa()
+			l.ReferenceOffsetMonths = &offsetCero
+			l.InitialPeriodMonths = &tramoCero
+			return l
+		}(),
+		"sin sync": prestamoCasa(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.toml")
+			cfg := Default()
+			cfg.Loans = map[string]loan.Loan{"casa": l}
+			if err := cfg.Save(path); err != nil {
+				t.Fatalf("Save() error = %v", err)
+			}
+			got, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if len(got.Loans) != 1 {
+				t.Fatalf("Loans = %v, want un préstamo", got.Loans)
+			}
+			equalLoans(t, l, got.Loans["casa"])
+		})
+	}
+}
+
+// TestLoadSinLoansSection: una config sin sección loans carga el mapa vacío,
+// nunca nil (el resto del programa puede recorrerlo sin comprobar).
+func TestLoadSinLoansSection(t *testing.T) {
+	path := writeBytes(t, t.TempDir(), "config.toml", []byte(validTOML))
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Loans == nil || len(got.Loans) != 0 {
+		t.Fatalf("Loans = %#v, want mapa vacío no nil", got.Loans)
 	}
 }
