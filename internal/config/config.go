@@ -7,6 +7,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 )
 
 // SchemaVersion is the version of the config file format. It is independent of
@@ -16,8 +17,7 @@ import (
 const SchemaVersion = 1
 
 // Config is the local configuration of the user (arranque §7). It holds the
-// series-code overrides and reserves room for the sections LOAN-01 (saved
-// loans) and WATCH-01 (watch settings) will add later; fields are additive
+// series-code overrides and the saved loans (LOAN-01); fields are additive
 // within SchemaVersion.
 type Config struct {
 	// SchemaVersion is the config format version this file was written with.
@@ -29,14 +29,20 @@ type Config struct {
 	// then the map is stored verbatim. An absent or empty map means no
 	// override.
 	Indices map[string]string `toml:"indices"`
+	// Loans guarda los préstamos del usuario por id ([loans.<id>],
+	// docs/ARRANQUE.md §4.1). Un préstamo incompleto se guarda igual: es
+	// dato del usuario y `loan show` avisa de lo que falta (LOAN-01.1);
+	// la validación estricta la aplican los comandos que calculan.
+	Loans map[string]loan.Loan `toml:"loans,omitempty"`
 }
 
 // Default returns the configuration to use when no file exists: the current
-// SchemaVersion and no overrides.
+// SchemaVersion, no overrides and no loans.
 func Default() Config {
 	return Config{
 		SchemaVersion: SchemaVersion,
 		Indices:       map[string]string{},
+		Loans:         map[string]loan.Loan{},
 	}
 }
 
@@ -69,6 +75,9 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.Indices == nil {
 		cfg.Indices = map[string]string{}
+	}
+	if cfg.Loans == nil {
+		cfg.Loans = map[string]loan.Loan{}
 	}
 	return cfg, nil
 }
