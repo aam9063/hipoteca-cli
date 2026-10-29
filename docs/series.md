@@ -134,9 +134,10 @@ Probado exhaustivamente:
 | Un año futuro (`2099`) | 412 |
 
 Consecuencia para la CLI: los rangos de `--range` son **30M, 60M, MAX y un año**, y `30M`
-no son 30 puntos sino 31. `hipoteca index show --range 36M` no puede traducirse
-literalmente a la API: se resuelve con `MAX` (o el año correspondiente) y se recorta en
-cliente. Esa decisión es de CMD-01.
+no son 30 puntos sino 31. La CLI rechaza deliberadamente con un error de uso (código 2)
+los rangos que la API no admite (`36M`, `12M`, …) en lugar de recortarlos en cliente, así
+que el ejemplo `--range 36M` del arranque está intencionadamente sin ofrecer. Esa decisión
+es de CMD-01.
 
 ---
 

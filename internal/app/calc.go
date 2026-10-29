@@ -3,19 +3,12 @@ package app
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/finance"
 	"github.com/aam9063/hipoteca-cli/internal/model"
 )
-
-// catalogVerifiedAt es la fecha de verificación del catálogo de series
-// (internal/bde/series.yaml, campo verified_at): la única fecha real que este
-// binario asocia a los datos originales. `calc` no consulta la red — sus
-// entradas las da el usuario — así que su atribución de datos procesados data
-// ese origen estático; el test TestCatalogVerifiedAtCoincideConSeriesYAML
-// impide que la constante se desvíe del catálogo.
-const catalogVerifiedAt = "2026-10-28"
 
 // CalcInputs son las entradas del cálculo, devueltas en la salida tal cual
 // (decisión 2 de CMD-01): la respuesta incluye sus entradas.
@@ -39,7 +32,12 @@ type CalcResult struct {
 // Calc resuelve el cálculo suelto del sistema francés con las convenciones de
 // docs/calculos.md a través de internal/finance, sin préstamo guardado y sin
 // red. No devuelve ningún consejo: sólo cifras.
-func Calc(principal, annualRatePct model.Decimal, months int) (CalcResult, error) {
+//
+// `now` fecha la atribución de datos procesados (P-05): su data_updated_at es
+// la fecha de elaboración del resultado — el día de la ejecución, en UTC — y
+// no la de ningún dato: este cálculo no consulta ningún dato del Banco de
+// España, sus entradas las da el usuario.
+func Calc(principal, annualRatePct model.Decimal, months int, now time.Time) (CalcResult, error) {
 	schedule, err := finance.Amortization(finance.Loan{
 		Principal:  principal.Decimal(),
 		AnnualRate: annualRatePct.Decimal(),
@@ -48,9 +46,9 @@ func Calc(principal, annualRatePct model.Decimal, months int) (CalcResult, error
 	if err != nil {
 		return CalcResult{}, calcUsageError(err)
 	}
-	attr, err := model.ProcessedAttribution(catalogVerifiedAt)
+	attr, err := model.ProcessedAttribution(now.UTC().Format("2006-01-02"))
 	if err != nil {
-		// La fecha es una constante validada por test: nunca ocurre.
+		// La fecha sale de time.UTC().Format: nunca ocurre.
 		return CalcResult{}, errs.New(errs.KindInternal, err.Error(), "")
 	}
 	return CalcResult{

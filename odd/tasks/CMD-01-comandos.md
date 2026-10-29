@@ -114,3 +114,51 @@ hace visible todo lo anterior.
 Implementación test-first de CMD-01.1–1.6: rojo observado (compilación), verde en
 `internal/app` y `internal/cli`, guarda de AST probada con una violación temporal en
 ambos paquetes. Suite completa y `bash scripts/check.sh` en verde. CMD-01.7 pendiente.
+
+### L3 · 2026-10-28 · ronda de corrección tras el verificador independiente
+
+Tres menores y dos nits del informe (PASS) corregidos test-first:
+
+- **Guarda anti-decimal**: resuelve el paquete del selector a través de las
+  importaciones del fichero (un alias `shdec.Decimal` ya no pasa) y desenvuelve
+  `*T`, `[]T` y `map[K]T` (`[]decimal.Decimal`, `map[string]decimal.Decimal`).
+  Casos de evasión añadidos como tests en `internal/app/nofloat_test.go` y
+  `internal/cli/nofloat_test.go` (rojo observado contra la guarda antigua).
+  **Límites residuales conocidos de la guarda, a propósito aquí para que nadie
+  la crea completa**: (1) un dot-import (`import . "github.com/shopspring/decimal"`)
+  deja `Decimal` como identificador pelado, sin selector, y no se ve; (2) un
+  tipo con nombre definido en *otro* paquete que envuelva a shopspring
+  (`type T decimal.Decimal`) usado como campo (`T`) pasa; (3) un alias de tipo
+  declarado en otro paquete (`type D = decimal.Decimal`) usado como campo
+  (`D`) pasa. Dentro del propio paquete sí cubre todo struct de los ficheros
+  no-test, incluidas las variantes anteriores si el alias/tipo se declara ahí.
+- **Atribución de `calc`**: deja de usar `catalogVerifiedAt` (`verified_at` del
+  catálogo, que no era procedencia de nada: `calc` no consume datos del Banco).
+  `app.Calc` recibe `now time.Time` y la atribución de datos procesados lleva
+  como `data_updated_at` la **fecha de elaboración**: el día de la ejecución,
+  en UTC (`YYYY-MM-DD`). Esto **sustituye** la decisión anotada en L2 sobre la
+  atribución de `calc`; el test que ataba la constante a `series.yaml` se
+  elimina y no debe recrearse.
+- **Nits**: errata `"indícalos los tres"` → `"indica los tres"` en `calc`; y
+  docs/series.md §2.3 ahora dice que la CLI rechaza deliberadamente (usage/2)
+  los rangos que la API no admite (`36M`, `12M`, …) en vez de recortarlos en
+  cliente — el ejemplo `--range 36M` del arranque está sin ofrecer a propósito.
+- **Pendiente**: el User-Agent real (`hipoteca-cli/<version>`) no se pudo
+  enchufar en esta ronda: el cableado del cliente pasa por
+  `app.NewRuntime()` (`internal/app/index.go`) y `Deps.runtime()`
+  (`internal/cli/root.go`), fuera de las superficies de edición de la ronda.
+
+### L4 · 2026-10-28 · cierre del gate
+
+Verificador independiente: **PASS** con 0 blockers y 0 majors, sobre 1.840 líneas. Tres minors
+y cuatro nits, todos corregidos en una sola ronda:
+
+- la guarda anti-decimal se evadía con alias de import, slices y maps; ahora resuelve el
+  paquete por los imports y desenvuelve `ArrayType`/`MapType` (10 casos de prueba);
+- `calc` fechaba su atribución con el `verified_at` del catálogo aunque no usa datos del
+  Banco; ahora usa la fecha de elaboración en UTC;
+- el `User-Agent` era siempre `hipoteca-cli/dev` y había un comentario prometiendo que
+  CMD-01 lo enchufaría; ahora la versión inyectada llega al cliente.
+
+Límites residuales de la guarda, escritos a propósito: no atrapa dot-imports, ni un tipo con
+nombre que envuelva `decimal.Decimal` declarado en otro paquete, ni alias declarados fuera.

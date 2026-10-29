@@ -37,7 +37,14 @@ type Runtime struct {
 // config.CacheDir() (decisión 6 de CMD-01: `index` usa la caché). Un fallo al
 // resolver el directorio de caché no es un error: la caché es descartable
 // (decisión 4 de BDE-01) y sin ella la petición simplemente va a la red.
-func NewRuntime() (*Runtime, error) {
+//
+// `version` es la versión inyectada en el binario (BuildInfo de main): viaja
+// al Banco como User-Agent hipoteca-cli/<versión>; un binario sin versión
+// (sin -ldflags) es "dev".
+func NewRuntime(version string) (*Runtime, error) {
+	if version == "" {
+		version = "dev"
+	}
 	path, err := config.ConfigPath()
 	if err != nil {
 		return nil, err
@@ -50,11 +57,24 @@ func NewRuntime() (*Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	var source Source = bde.NewHTTPClient(catalog)
+	var source Source = productionClient(catalog, nil, version)
 	if dir, err := config.CacheDir(); err == nil {
-		source = bde.NewHTTPClientWithCache(catalog, bde.NewCache(dir))
+		source = productionClient(catalog, bde.NewCache(dir), version)
 	}
 	return &Runtime{Catalog: catalog, Source: source}, nil
+}
+
+// productionClient construye el cliente de producción para la versión dada:
+// con o sin caché, siempre identificado como hipoteca-cli/<versión> (o
+// hipoteca-cli/dev) ante el Banco — el "dev" eterno era una promesa de CMD-01
+// ya cumplida.
+func productionClient(catalog *bde.Catalog, cache *bde.Cache, version string) Source {
+	client := bde.NewHTTPClient(catalog)
+	if cache != nil {
+		client = bde.NewHTTPClientWithCache(catalog, cache)
+	}
+	client.SetUserAgent("hipoteca-cli/" + version)
+	return client
 }
 
 // IndexValue es un valor puntual de un índice del catálogo, listo para el

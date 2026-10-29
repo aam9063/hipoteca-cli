@@ -20,8 +20,9 @@ import (
 const (
 	// defaultTimeout es el timeout de la petición completa (decisión 6).
 	defaultTimeout = 15 * time.Second
-	// defaultUserAgent identifica al cliente ante el Banco (docs/series.md §7).
-	// La versión concreta la enchufará CMD-01; mientras tanto, "dev".
+	// defaultUserAgent identifica al cliente ante el Banco (docs/series.md §7)
+	// cuando nadie fija otro; el cableado de producción lo sustituye por
+	// hipoteca-cli/<versión> con SetUserAgent.
 	defaultUserAgent = "hipoteca-cli/dev"
 	// defaultRetryWait es la espera del único reintento permitido.
 	defaultRetryWait = 500 * time.Millisecond
@@ -55,9 +56,10 @@ type HTTPClient struct {
 }
 
 // NewHTTPClient construye el cliente contra la base del catálogo embebido, con
-// timeout de 15 s, User-Agent hipoteca-cli/dev y un único reintento con backoff
-// ante 5xx/429 (decisión 6). El catálogo debe ser no nulo: es quien traduce
-// id → código y clasifica los errores por-elemento.
+// timeout de 15 s, User-Agent hipoteca-cli/dev (sustituible con SetUserAgent;
+// el cableado de producción lo fija a hipoteca-cli/<versión>) y un único
+// reintento con backoff ante 5xx/429 (decisión 6). El catálogo debe ser no nulo:
+// es quien traduce id → código y clasifica los errores por-elemento.
 func NewHTTPClient(catalog *Catalog) *HTTPClient {
 	if catalog == nil {
 		panic("bde: NewHTTPClient necesita un catálogo no nulo")
@@ -77,6 +79,19 @@ func NewHTTPClientWithCache(catalog *Catalog, cache *Cache) *HTTPClient {
 	c := NewHTTPClient(catalog)
 	c.cache = cache
 	return c
+}
+
+// SetUserAgent fija el User-Agent que el cliente envía en cada petición: el
+// cableado de producción lo llama con hipoteca-cli/<versión> (CMD-01); sin
+// llamarlo, el cliente sigue enviando hipoteca-cli/dev.
+func (c *HTTPClient) SetUserAgent(ua string) {
+	c.userAgent = ua
+}
+
+// UserAgent devuelve el User-Agent que el cliente enviaría: expuesto para que
+// el cableado se pueda probar sin lanzar una petición.
+func (c *HTTPClient) UserAgent() string {
+	return c.userAgent
 }
 
 // Latest devuelve el último valor publicado de cada id del catálogo, mediante
