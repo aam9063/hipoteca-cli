@@ -1,11 +1,13 @@
 // Package cli owns the cobra command tree: argument parsing, flags and the shape of
 // what reaches stdout and stderr. It performs no calculation, no network access and no
-// file access; those belong to internal/app and its dependencies.
+// file access; those belong to internal/app and its dependencies. The orchestration
+// dependencies are injected as Deps so tests can run the whole tree without red.
 package cli
 
 import (
 	"fmt"
 
+	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/spf13/cobra"
 )
@@ -17,9 +19,30 @@ type BuildInfo struct {
 	Date    string
 }
 
-// NewRootCmd builds the command tree. It returns a command so tests can execute it
-// without touching os.Args or the real stdout.
+// Deps son las dependencias que los comandos resuelven al ejecutarse, no al
+// construir el árbol: un fallo de configuración es un error del contrato del
+// comando, no un panic al arrancar. El campo nil usa las de producción
+// (app.NewRuntime); los tests inyectan una función propia para no tocar la red.
+type Deps struct {
+	Runtime func() (*app.Runtime, error)
+}
+
+// runtime resuelve el runtime para la petición en vuelo.
+func (d Deps) runtime() (*app.Runtime, error) {
+	if d.Runtime != nil {
+		return d.Runtime()
+	}
+	return app.NewRuntime()
+}
+
+// NewRootCmd builds the command tree with the production dependencies. It returns a
+// command so tests can execute it without touching os.Args or the real stdout.
 func NewRootCmd(info BuildInfo) *cobra.Command {
+	return NewRootCmdWithDeps(info, Deps{})
+}
+
+// NewRootCmdWithDeps builds the command tree over the given dependencies.
+func NewRootCmdWithDeps(info BuildInfo, deps Deps) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "hipoteca",
 		Short: "Índices oficiales del Banco de España y cálculos de tu hipoteca",
@@ -57,7 +80,7 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		},
 	}
 
-	root.AddCommand(newVersionCmd(info))
+	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newRevisionCmd(), newScheduleCmd())
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.
