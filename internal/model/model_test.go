@@ -75,6 +75,48 @@ func TestAttributionRejectsInvalidUpdatedAt(t *testing.T) {
 	}
 }
 
+// model.Money normalises every amount of the output contract to exactly two
+// decimals (verifier minor 1): decimal.Zero arrives with exponent 0 and would
+// serialise "0" while its money siblings carry cents. Rates keep model.Decimal
+// and their own scale.
+func TestNewMoneyNormalisesToTwoDecimals(t *testing.T) {
+	cases := []struct {
+		name string
+		d    decimal.Decimal
+		want string
+	}{
+		{"zero gains cents", decimal.Zero, "0.00"},
+		{"exact cents untouched", decimal.New(310, -2), "3.10"},
+		{"integer amount gains cents", decimal.NewFromInt(10000), "10000.00"},
+		{"three decimals kept as cents value", decimal.New(74218, -3), "74.22"},
+		{"negative", decimal.New(-5, -2), "-0.05"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(NewMoney(tc.d))
+			if err != nil {
+				t.Fatalf("marshal failed: %v", err)
+			}
+			if got := string(raw); got != `"`+tc.want+`"` {
+				t.Errorf("NewMoney marshalled = %s, want %q", got, tc.want)
+			}
+		})
+	}
+	// A rate like 3.10 passes through untouched: NewMoney never changes a
+	// value that already carries cents.
+	rate, err := NewDecimal("3.10")
+	if err != nil {
+		t.Fatalf("NewDecimal failed: %v", err)
+	}
+	raw, err := json.Marshal(NewMoney(rate.Decimal()))
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	if got := string(raw); got != `"3.10"` {
+		t.Errorf("NewMoney on a rate = %s, want \"3.10\" untouched", got)
+	}
+}
+
 // The attribution block serialises with exactly the contract keys of §6.2.
 func TestAttributionJSONShape(t *testing.T) {
 	attr, err := ProcessedAttribution("2026-12-01")

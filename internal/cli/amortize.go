@@ -17,7 +17,18 @@ func newAmortizeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "amortize",
 		Short: "Efecto de una amortización anticipada: cuota menor, menos plazo o ambas",
-		Args:  noArgs("amortize"),
+		Long: `Calcula el efecto de amortizar anticipadamente sobre un cálculo suelto, sin
+préstamo guardado y sin red. En modo compare devuelve las dos opciones con sus
+cifras, sin recomendar ninguna.
+
+Cuando el importe agota el saldo, el préstamo cierra por el propio evento y la
+salida lo marca con closes_at_event (el mes del cierre). En ese caso
+payment_after significa cosas distintas según el modo: en reduce-payment es
+0.00, porque no queda plazo sobre el que recalcular una cuota; en reduce-term
+es la cuota mantenida, que es la del propio mes del evento y sí se cobró. En
+ambos el cálculo termina en ese mes: después del evento no existe ninguna
+cuota posterior.`,
+		Args: noArgs("amortize"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			flags := cmd.Flags()
 			for _, name := range []string{"principal", "rate", "months", "amount", "date", "mode"} {

@@ -43,6 +43,16 @@ func FromDecimal(d decimal.Decimal) Decimal {
 	return Decimal{v: d}
 }
 
+// NewMoney wraps an existing decimal.Decimal as a money amount of the output
+// contract: exactly two decimals. The money fields (payment, fee, outlay,
+// balances, interest, totals) always carry cents in the JSON — a zero is
+// "0.00", never "0" — while the rates keep Decimal with the scale the value
+// itself carries (3.10, 0.890). The value never changes: finance emits exact
+// cents, so this only fixes the scale.
+func NewMoney(d decimal.Decimal) Decimal {
+	return Decimal{v: d.Round(2)}
+}
+
 // Decimal returns the underlying decimal.Decimal, for callers that need the
 // shopspring API (comparisons, arithmetic) without exposing the field.
 func (d Decimal) Decimal() decimal.Decimal {
