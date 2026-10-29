@@ -17,6 +17,9 @@ import (
 // redondeo, el TIN de cada valor es el valor mismo: la cadena NewRate con el
 // diferencial 0, sin suelo y sin redondeo es la identidad.
 type ScenarioInputs struct {
+	// Loan es el id del préstamo guardado del que salieron capital, plazo,
+	// diferencial, suelo y redondeo; vacío en el camino de flags sueltas.
+	Loan       string         `json:"loan,omitempty"`
 	Principal  model.Decimal  `json:"principal"`
 	TermMonths int            `json:"term_months"`
 	Spread     model.Decimal  `json:"spread"`

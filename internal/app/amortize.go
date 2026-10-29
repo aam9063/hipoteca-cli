@@ -18,6 +18,9 @@ import (
 // ciento (0 en esta versión: los préstamos guardados son LOAN-01 y la CLI no
 // expone todavía una bandera de comisión).
 type AmortizeInputs struct {
+	// Loan es el id del préstamo guardado del que salieron capital, tipo,
+	// plazo y comisión; vacío en el camino de flags sueltas (LOAN-01).
+	Loan          string        `json:"loan,omitempty"`
 	Principal     model.Decimal `json:"principal"`
 	AnnualRatePct model.Decimal `json:"annual_rate_pct"`
 	TermMonths    int           `json:"term_months"`
