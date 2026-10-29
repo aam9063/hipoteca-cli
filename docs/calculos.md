@@ -103,6 +103,14 @@ La amortización anticipada usa la misma maquinaria: comisión
 el mismo plazo restante; en `reduce-term` se mantiene la cuota y el plazo es el número de
 meses que tarda en cerrarse (la última cuota absorbe el residuo).
 
+**Con un tipo negativo, el ahorro de la amortización anticipada es negativo.** El interés
+mensual es a favor del prestatario: bajar el capital significa dejar de ganar el subsidio
+que el saldo pendiente devengaba. El ahorro (`interest_saved`) se informa con signo —
+positivo con un TIN no negativo, negativo con un TIN negativo— y su magnitud es el
+subsidio no devengado (el interés a favor que el cuadro intacto ganaría en la misma
+ventana y en los meses que vive de más). Nunca se recorta a cero: la cifra con signo es
+la que explica al usuario qué ha pasado con su dinero.
+
 ### 1.6 Tolerancia de cierre
 
 El capital final del cuadro es exactamente `0.00` por diseño (convención 1.3). La
