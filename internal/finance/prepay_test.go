@@ -270,11 +270,11 @@ func TestPrepayFeeCase(t *testing.T) {
 //     aumenta los intereses restantes);
 //   - con TIN < 0 el ahorro es siempre ≤ 0 y su magnitud es exactamente el
 //     subsidio no devengado: el interés a favor del prestatario que el cuadro
-//     intacto ganaría en la misma ventana (y en los meses que vive de más),
-//     verificado con la identidad exacta InterestSaved = InterestBeforeWindow
-//     − InterestAfter + InterestBeforeTail, donde InterestBeforeTail es la
-//     cola del cuadro intacto más allá de la ventana; la pérdida nunca excede
-//     el subsidio íntegro de la vida intacta;
+//     intacto ganaría en la misma ventana (y en los meses que vive de más).
+//     InterestBeforeWindow se contrasta contra el cuadro base que el propio
+//     test calcula con Amortization; la pérdida nunca excede el subsidio
+//     íntegro de la vida intacta y la cola fuera de ventana sólo puede
+//     perder subsidio;
 //   - ambas familias cierran en exactamente 0.00, mantienen cada fila sin
 //     cuota, interés o capital negativos y preservan la identidad del capital.
 //
@@ -370,18 +370,26 @@ func TestPrepayGridProperties(t *testing.T) {
 										t.Errorf("%s: la pérdida %s excede el subsidio íntegro de la vida intacta %s",
 											label, pre.InterestSaved.String(), baseTail.String())
 									}
-									// Identidad exacta del subsidio no devengado:
-									//   ahorro = ventana intacta − vida nueva + cola intacta
-									//           más allá de la ventana (≤ 0)
+									// La cola intacta más allá de la ventana sólo puede
+									// perder subsidio (meses de menos de vida intacta).
 									beyondWindow := baseTail.Sub(pre.InterestBeforeWindow)
 									if beyondWindow.Sign() > 0 {
 										t.Errorf("%s: la cola intacta más allá de la ventana gana subsidio %s", label, beyondWindow.String())
 									}
-									want := pre.InterestBeforeWindow.Sub(afterTail).Add(beyondWindow)
-									if !pre.InterestSaved.Equal(want) {
-										t.Errorf("%s: ahorro %s != subsidio no devengado %s (ventana %s, vida nueva %s, cola %s)",
-											label, pre.InterestSaved.String(), want.String(),
-											pre.InterestBeforeWindow.String(), afterTail.String(), beyondWindow.String())
+									// Valor de InterestBeforeWindow contra el cuadro base
+									// que este test calculó por su cuenta (Amortization
+									// directa, no campos derivados de Prepay). Es la
+									// sustituta de la identidad algebraica retirada:
+									// IBW − vida nueva + cola fuera de ventana se reduce
+									// a baseTail − vida nueva (la ventana se cancela) y
+									// sólo probaba cableado, nunca el valor del campo.
+									var wantWindow decimal.Decimal
+									for _, row := range baseline.Rows[afterMonth:pre.TermAfter] {
+										wantWindow = wantWindow.Add(row.Interest)
+									}
+									if !pre.InterestBeforeWindow.Equal(wantWindow) {
+										t.Errorf("%s: InterestBeforeWindow %s != ventana del cuadro base %s (meses %d..%d)",
+											label, pre.InterestBeforeWindow.String(), wantWindow.String(), afterMonth+1, pre.TermAfter)
 									}
 								}
 								if pre.TermAfter > pre.TermBefore {
@@ -477,9 +485,9 @@ func TestPrepayNegativeRateSignedSaving(t *testing.T) {
 		if p.InterestSaved.Sign() > 0 {
 			t.Errorf("%s: ahorro %s debe ser ≤ 0 con TIN negativo", string(p.Mode), p.InterestSaved.String())
 		}
-		// Identidad exacta del subsidio no devengado, con los campos públicos:
-		// las filas hasta el evento son las del cuadro intacto, así que el
-		// prefijo se lee del propio cuadro resultado.
+		// Signo y límites del subsidio no devengado: el prefijo se lee del
+		// propio cuadro resultado (sus filas hasta el evento son las del cuadro
+		// intacto).
 		prefix := decimal.Zero
 		for _, row := range p.Schedule.Rows[:rep.AfterMonth] {
 			prefix = prefix.Add(row.Interest)
@@ -494,11 +502,22 @@ func TestPrepayNegativeRateSignedSaving(t *testing.T) {
 		if beyondWindow.Sign() > 0 {
 			t.Errorf("%s: la cola intacta más allá de la ventana gana subsidio %s", string(p.Mode), beyondWindow.String())
 		}
-		want := p.InterestBeforeWindow.Sub(afterTail).Add(beyondWindow)
-		if !p.InterestSaved.Equal(want) {
-			t.Errorf("%s: ahorro %s != subsidio no devengado %s (ventana %s, vida nueva %s, cola %s)",
-				string(p.Mode), p.InterestSaved.String(), want.String(),
-				p.InterestBeforeWindow.String(), afterTail.String(), beyondWindow.String())
+		// Valor de InterestBeforeWindow contra un Amortization fresco: la
+		// identidad algebraica anterior (IBW − vida nueva + cola) se reducía a
+		// baseTail − vida nueva y la ventana se cancelaba, de modo que nunca
+		// habría detectado una InterestBeforeWindow mal calculada; el verificador
+		// independiente lo señaló y este contraste es su sustituto sustantivo.
+		fresh, err := Amortization(loan)
+		if err != nil {
+			t.Fatalf("Amortization del préstamo base: %v", err)
+		}
+		var wantWindow decimal.Decimal
+		for _, row := range fresh.Rows[rep.AfterMonth:p.TermAfter] {
+			wantWindow = wantWindow.Add(row.Interest)
+		}
+		if !p.InterestBeforeWindow.Equal(wantWindow) {
+			t.Errorf("%s: InterestBeforeWindow %s != ventana del cuadro fresco %s (meses %d..%d)",
+				string(p.Mode), p.InterestBeforeWindow.String(), wantWindow.String(), rep.AfterMonth+1, p.TermAfter)
 		}
 		if p.InterestSaved.LessThan(baseTail) {
 			t.Errorf("%s: la pérdida %s excede el subsidio íntegro de la vida intacta %s",

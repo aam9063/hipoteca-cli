@@ -95,3 +95,21 @@ cálculo. Corrección del usuario: decisión 5 reescrita como regla condicional 
 signo del tipo; el cálculo no cambia, `InterestSaved` conserva el signo y se expone
 `InterestBeforeWindow` (interés del cuadro intacto en la misma ventana) para que el
 signo sea interpretable. Documentado también en docs/calculos.md §1.5.
+
+### L3 · 2026-10-28 · revisión independiente: tautología retirada y obligación M1
+
+El verificador independiente (PASS, sin bloqueos ni mayores) detectó que la «identidad
+exacta del subsidio no devengado» era tautológica: `IBW − vida nueva + cola fuera de
+ventana` se reduce algebraicamente a `baseTail − vida nueva` (la ventana se cancela), de
+modo que nunca habría detectado una `InterestBeforeWindow` mal calculada. Retirada la
+identidad; el valor del campo se contrasta ahora contra un cuadro base fresco
+(`Amortization` calculado fuera de `Prepay`) en la rejilla y en un test propio, y el
+verificador ya lo había validado aparte sobre 850 combinaciones. Se añaden además los
+tests duraderos de la revisión (la comisión no toca la economía; residuos a céntimo del
+reduce-term a 0 % con prueba de plazo mínimo; valor cero junto a cada error centinela).
+
+**Obligación M1 para CMD-02** (importe que agota el saldo): el cuadro devuelto cierra por
+el propio evento — la última fila lleva el capital anterior al evento, `BalanceAfter` es
+0.00 exacto, `TermAfter` es el mes del evento y `Schedule.TotalPaid` no incluye el
+desembolso. CMD-02 debe renderizar el evento como línea propia. Documentado en el doc
+de `Prepayment`/`Prepay` y en docs/calculos.md §1.5.
