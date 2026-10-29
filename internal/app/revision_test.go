@@ -139,8 +139,9 @@ func TestRevisionPublicada(t *testing.T) {
 	if !res.Payment.DifferenceYear.Decimal().Equal(diff.Mul(decimal.NewFromInt(12))) {
 		t.Fatalf("difference_year = %s, want 12×%s", res.Payment.DifferenceYear, diff)
 	}
-	if len(res.Warnings) != 0 {
-		t.Fatalf("warnings = %v, want vacío", res.Warnings)
+	// §5.2: sin avisos, warnings es una lista vacía, no null.
+	if res.Warnings == nil || len(res.Warnings) != 0 {
+		t.Fatalf("warnings = %v, want [] (lista vacía, no null)", res.Warnings)
 	}
 	if res.Attribution.Text != "Elaboración propia con datos extraídos del sitio web del Banco de España (www.bde.es)" ||
 		res.Attribution.DataUpdatedAt != "2026-09-01" || !res.Attribution.NotEndorsed {

@@ -61,7 +61,11 @@ func flagsPrestamo(cmd *cobra.Command) {
 // prestamoDeFlags construye un préstamo con las banderas que llegaron
 // cambiadas (add guarda tal cual, aunque queden campos de la escritura sin
 // declarar: es dato del usuario y show avisa). El suelo "none" o vacío es
-// "sin suelo" explícito.
+// "sin suelo" explícito. NO valida: `add` guarda el préstamo completo de las
+// banderas y valida ése antes de escribir; `edit` fusiona sobre el guardado
+// y valida el resultado fusionado en LoanEdit, porque las banderas solas no
+// describen el préstamo resultante (validarlas solas rechazaría cambiar un
+// solo campo, p. ej. el tipo no llega y no es un error).
 func prestamoDeFlags(cmd *cobra.Command) (loan.Loan, error) {
 	flags := cmd.Flags()
 	var l loan.Loan
@@ -121,8 +125,17 @@ func prestamoDeFlags(cmd *cobra.Command) (loan.Loan, error) {
 	if flags.Changed("fee-pct") {
 		l.EarlyRepaymentFeePct, _ = flags.GetString("fee-pct")
 	}
-	// Los valores presentes se validan aquí y en la capa de aplicación: el
-	// usuario ve el error antes de que se escriba nada en la config.
+	return l, nil
+}
+
+// prestamoDeFlagsValidado es la variante de `add`: el préstamo construido
+// con las banderas es el que se guarda entero, así que se valida tal cual
+// antes de abrir la config.
+func prestamoDeFlagsValidado(cmd *cobra.Command) (loan.Loan, error) {
+	l, err := prestamoDeFlags(cmd)
+	if err != nil {
+		return loan.Loan{}, err
+	}
 	if err := l.ValidateValues(); err != nil {
 		return loan.Loan{}, err
 	}
@@ -138,7 +151,7 @@ func newLoanAddCmd(deps Deps) *cobra.Command {
 		Short: "Guarda un préstamo nuevo en la config local",
 		Args:  exactArgs("loan add", 1, "ejemplo: hipoteca loan add casa --name Casa --type variable --start-date 2021-06-01 --principal 180000 --months 360"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			l, err := prestamoDeFlags(cmd)
+			l, err := prestamoDeFlagsValidado(cmd)
 			if err != nil {
 				return err
 			}
@@ -168,7 +181,11 @@ func newLoanEditCmd(deps Deps) *cobra.Command {
 		Short: "Cambia los campos indicados de un préstamo guardado",
 		Args:  exactArgs("loan edit", 1, "\"hipoteca loan list\" muestra los ids guardados"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Se validan los valores de las banderas antes de abrir la config.
+			// Sólo se parsean las banderas: la validación de valores ocurre
+			// sobre el préstamo ya fusionado en app.LoanEdit, que es el
+			// resultado real de la edición. Un valor presente inválido (mal
+			// enum, mes negativo) sigue fallando con usage/2 nombrando el
+			// campo, y no se escribe nada en la config.
 			cambios, err := prestamoDeFlags(cmd)
 			if err != nil {
 				return err
@@ -293,23 +310,30 @@ func newLoanListCmd(deps Deps) *cobra.Command {
 	}
 }
 
-// newLoanRemoveCmd: `loan remove <id> --yes` — sin --yes responde
-// confirmation_required/2 y no toca nada (decisión 3 de LOAN-01).
+// newLoanRemoveCmd: `loan remove [<id>] --yes` — sin --yes responde
+// confirmation_required/2 y no toca nada (decisión 3 de LOAN-01). El id es
+// opcional con un único préstamo guardado, igual que show, sync, revision y
+// schedule (LOAN-01.4).
 func newLoanRemoveCmd(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove <id>",
+		Use:   "remove [id]",
 		Short: "Borra un préstamo guardado (irreversible; pide --yes)",
-		Args:  exactArgs("loan remove", 1, "\"hipoteca loan list\" muestra los ids guardados"),
+		Args:  maxArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			yes, _ := cmd.Flags().GetBool("yes")
+			id := ""
+			if len(args) == 1 {
+				id = args[0]
+			}
 			path, err := deps.configPath()
 			if err != nil {
 				return err
 			}
-			if err := app.LoanRemove(path, args[0], yes); err != nil {
+			resolved, err := app.LoanRemove(path, id, yes)
+			if err != nil {
 				return err
 			}
-			return writeResult(cmd, removedResult{SchemaVersion: 1, Loan: args[0], Removed: true})
+			return writeResult(cmd, removedResult{SchemaVersion: 1, Loan: resolved, Removed: true})
 		},
 	}
 	cmd.Flags().Bool("yes", false, "confirma el borrado: sin ella no se borra nada")
