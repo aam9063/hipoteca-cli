@@ -27,12 +27,14 @@ type BuildInfo struct {
 // Version es la versión del binario que la producción pasa a app.NewRuntime
 // para el User-Agent ante el Banco; NewRootCmdWithDeps la rellena desde
 // BuildInfo cuando llega vacía. ConfigPath es la ruta de la config local para
-// los comandos de préstamos (LOAN-01): la producción resuelve
-// config.ConfigPath y los tests inyectan una temporal, de modo que ningún
-// test lee la config del usuario.
+// los comandos de préstamos (LOAN-01) y DataPath la de la base de estado de
+// las vigilancias (WATCH-01): la producción resuelve config.ConfigPath y
+// config.DataPath y los tests inyectan temporales, de modo que ningún test
+// lee ni escribe datos del usuario.
 type Deps struct {
 	Runtime    func() (*app.Runtime, error)
 	ConfigPath func() (string, error)
+	DataPath   func() (string, error)
 	Version    string
 }
 
@@ -56,6 +58,15 @@ func (d Deps) configPath() (string, error) {
 		return d.ConfigPath()
 	}
 	return config.ConfigPath()
+}
+
+// dataPath resuelve la ruta de la base de estado de las vigilancias (WATCH-01:
+// config.DataPath, sustituible en los tests).
+func (d Deps) dataPath() (string, error) {
+	if d.DataPath != nil {
+		return d.DataPath()
+	}
+	return config.DataPath()
 }
 
 // NewRootCmd builds the command tree with the production dependencies. It returns a
@@ -108,7 +119,7 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		},
 	}
 
-	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps))
+	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps), newWatchCmd(deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.

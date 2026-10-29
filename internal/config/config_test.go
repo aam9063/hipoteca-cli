@@ -309,3 +309,51 @@ func TestLoadSinLoansSection(t *testing.T) {
 		t.Fatalf("Loans = %#v, want mapa vacío no nil", got.Loans)
 	}
 }
+
+// TestLoadParsesSinksSection (WATCH-01): la sección [sinks.<nombre>] se lee y
+// se guarda; una config sin ella deja el mapa vacío no nil.
+func TestLoadParsesSinksSection(t *testing.T) {
+	tomlConSinks := `schema_version = 1
+
+[sinks.aviso]
+type = "webhook"
+url = "https://example.com/hook"
+`
+	path := writeBytes(t, t.TempDir(), "config.toml", []byte(tomlConSinks))
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	sink, ok := got.Sinks["aviso"]
+	if !ok {
+		t.Fatalf("Sinks = %#v, want el sink \"aviso\"", got.Sinks)
+	}
+	if sink.Type != "webhook" || sink.URL != "https://example.com/hook" {
+		t.Errorf("sink = %+v, want webhook https://example.com/hook", sink)
+	}
+
+	// Round-trip: guardar una config con sinks la lee igual.
+	got.Sinks["otro"] = Sink{Type: "webhook", URL: "https://example.org/otro"}
+	if err := got.Save(path); err != nil {
+		t.Fatalf("Save(): %v", err)
+	}
+	rewritten, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() tras Save(): %v", err)
+	}
+	if len(rewritten.Sinks) != 2 || rewritten.Sinks["otro"].URL != "https://example.org/otro" {
+		t.Errorf("Sinks tras round-trip = %#v, want los dos sinks", rewritten.Sinks)
+	}
+}
+
+// TestLoadSinSinksSection: una config sin [sinks] funciona (mapa vacío no nil).
+func TestLoadSinSinksSection(t *testing.T) {
+	path := writeBytes(t, t.TempDir(), "config.toml", []byte(validTOML))
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Sinks == nil || len(got.Sinks) != 0 {
+		t.Fatalf("Sinks = %#v, want mapa vacío no nil", got.Sinks)
+	}
+}
