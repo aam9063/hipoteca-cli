@@ -82,3 +82,24 @@ Test en rojo, implementación, verificación.
 ### L1 · 2026-10-29 · decisión del usuario
 
 «watch»: seguir con WATCH-01 tras cerrar FIN-04.
+
+### L2 · 2026-10-29 · corrección del verificador (PASS WITH FIXES)
+
+Cuatro hallazgos corregidos:
+
+1. Bloqueo P-03: el webhook ya no sigue redirecciones (`CheckRedirect` →
+   `http.ErrUseLastResponse`); una 3xx es fallo del sink (código 5) con el
+   evento a salvo. Test: un sink con 307 a otro host deja el segundo host sin
+   recibir nada.
+2. El contexto del llamador llega hasta el sink (`deliver(ctx, ...)`);
+   una entrega en vuelo aborta con cancelled/2.
+3. Guardia de esquema: `PRAGMA user_version` = 1; versión distinta o un
+   SQLite ajeno (tablas, user_version 0) se rechazan nombrando fichero y
+   versión; nunca se adoptan en silencio.
+4. Los mensajes de error del webhook censuran el userinfo de la URL
+   (`redactedURL`) y el detalle de transporte va sin la URL
+   (`transportCause`).
+
+Más la sonda `TestReintentoSinWithImpactNoSacaDatosDelPrestamo` (el reintento
+de una vigilancia sin --with-impact no lleva impacto ni dato del préstamo,
+aunque haya calculador conectado). `scripts/check.sh` en verde.

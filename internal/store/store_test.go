@@ -1,12 +1,15 @@
 package store
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 )
@@ -285,5 +288,74 @@ func assertCode(t *testing.T, err error, code int) {
 	}
 	if env.Error.ExitCode != code {
 		t.Fatalf("código = %d, want %d (mensaje: %s)", env.Error.ExitCode, code, env.Error.Message)
+	}
+}
+
+// TestOpenFijaLaVersionDeEsquemaEnBaseNueva (Fix 3): una base recién creada
+// queda marcada con user_version 1, la versión de este esquema.
+func TestOpenFijaLaVersionDeEsquemaEnBaseNueva(t *testing.T) {
+	_, path := openTemp(t)
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("abrir la base para leer user_version: %v", err)
+	}
+	defer raw.Close()
+	var version int
+	if err := raw.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatalf("leer user_version: %v", err)
+	}
+	if version != 1 {
+		t.Errorf("user_version = %d, want 1", version)
+	}
+}
+
+// TestOpenRechazaVersionDeEsquemaMasNueva (Fix 3): una base escrita con un
+// esquema más nuevo se rechaza con un error que nombra el fichero y la
+// versión; nunca se adopta en silencio.
+func TestOpenRechazaVersionDeEsquemaMasNueva(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hipoteca.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("crear la base de prueba: %v", err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE watches (id INTEGER); PRAGMA user_version = 2`); err != nil {
+		t.Fatalf("preparar la base de prueba: %v", err)
+	}
+	_ = raw.Close()
+
+	_, err = Open(path)
+	if err == nil {
+		t.Fatal("Open de una base con user_version 2: se esperaba error")
+	}
+	assertCode(t, err, 1)
+	for _, want := range []string{"hipoteca.db", "2"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("el error debe nombrar %q, got %q", want, err.Error())
+		}
+	}
+}
+
+// TestOpenRechazaSQLiteAjenoSinVersion (Fix 3): un SQLite válido de otro
+// programa (tablas, user_version 0) no se adopta como base del programa.
+func TestOpenRechazaSQLiteAjenoSinVersion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hipoteca.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("crear la base de prueba: %v", err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE favoritos_del_usuario (id INTEGER)`); err != nil {
+		t.Fatalf("preparar la base de prueba: %v", err)
+	}
+	_ = raw.Close()
+
+	_, err = Open(path)
+	if err == nil {
+		t.Fatal("Open de un SQLite ajeno: se esperaba error")
+	}
+	assertCode(t, err, 1)
+	if !strings.Contains(err.Error(), "hipoteca.db") {
+		t.Errorf("el error debe nombrar el fichero, got %q", err.Error())
 	}
 }

@@ -3,6 +3,7 @@ package watch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -287,5 +288,84 @@ func TestNotificationConWithImpactMarcado(t *testing.T) {
 	payload := string(b)
 	if !strings.Contains(payload, "préstamo") || !strings.Contains(payload, "--with-impact") {
 		t.Errorf("el payload debe llevar la advertencia P-03 marcando el dato del préstamo:\n%s", payload)
+	}
+}
+
+// TestReintentoSinWithImpactNoSacaDatosDelPrestamo (sonda del verificador):
+// el reintento de un evento de una vigilancia sin --with-impact no calcula ni
+// entrega impacto aunque haya un calculador conectado: el payload sigue sin
+// ningún dato del préstamo.
+func TestReintentoSinWithImpactNoSacaDatosDelPrestamo(t *testing.T) {
+	f := newFixture(t, &stubSource{obs: map[string]bde.Observation{"D_1NBAF472": oct2026()}})
+	f.addWatch(t, "euribor-1y", false)
+
+	// Primera pasada: el sink falla; el evento queda grabado sin entregar.
+	f.sink.fail = true
+	if _, err := Check(context.Background(), f.deps); err == nil {
+		t.Fatal("primera pasada con el sink caído: se esperaba error")
+	}
+
+	// Reintento con un calculador de impacto conectado: como la vigilancia no
+	// se creó con --with-impact, ni se le llama ni aparece dato del préstamo.
+	f.sink.fail = false
+	f.deps.ImpactFor = func(target string, _ model.Decimal) (Impact, []string, error) {
+		prev, _ := model.NewDecimal("742.18")
+		next, _ := model.NewDecimal("740.31")
+		diff, _ := model.NewDecimal("-1.87")
+		return Impact{
+			Loans: []LoanImpact{{Loan: "casa", Payment: prev, NewPayment: next, DifferenceMonth: diff}},
+		}, nil, nil
+	}
+	events, err := Check(context.Background(), f.deps)
+	if err != nil {
+		t.Fatalf("reintento: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("el reintento devolvió %d eventos, want 1", len(events))
+	}
+	if events[0].Impact != nil {
+		t.Fatalf("impact = %+v, want nil: sin --with-impact no hay bloque de impacto", events[0].Impact)
+	}
+	b, err := json.Marshal(events[0])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, prohibited := range []string{"casa", "principal", `"payment"`, `"impact"`, "180000", "742.18"} {
+		if strings.Contains(string(b), prohibited) {
+			t.Errorf("el payload del reintento contiene %q:\n%s", prohibited, b)
+		}
+	}
+}
+
+// sinkCtx espera el contexto: reproduce un sink en vuelo cuando llega el
+// Ctrl+C. Con Check bien cableado, el contexto del llamador debe llegarle.
+type sinkCtx struct{}
+
+func (sinkCtx) Deliver(ctx context.Context, _ any) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// TestCheckPasaElContextoAlSink (Fix 2): la cancelación del contexto del
+// llamador aborta una entrega en vuelo; el error es el del contexto.
+func TestCheckPasaElContextoAlSink(t *testing.T) {
+	f := newFixture(t, &stubSource{obs: map[string]bde.Observation{"D_1NBAF472": oct2026()}})
+	f.addWatch(t, "euribor-1y", false)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	f.deps.SinkFor = func(string) (Sink, error) { return sinkCtx{}, nil }
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := Check(ctx, f.deps)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("err = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Check no abortó con el contexto cancelado: el contexto no llega al sink")
 	}
 }

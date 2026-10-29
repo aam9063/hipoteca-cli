@@ -53,6 +53,12 @@ type Seen struct {
 // precisión de nanosegundos, para que leído y escrito coincidan.
 const stamp = time.RFC3339Nano
 
+// schemaVersion es la versión del esquema guardada en PRAGMA user_version.
+// Una base con otra versión —de un programa ajeno o de una versión futura—
+// se rechaza: adoptar en silencio un fichero que no es nuestro nunca es una
+// opción (Fix 3 del verificador de WATCH-01).
+const schemaVersion = 1
+
 // schema crea las dos tablas si no existen. La clave única de seen_months
 // ((watch_id, month)) es la que garantiza la decisión 2: un evento por mes
 // nuevo, ni cero ni dos.
@@ -111,12 +117,61 @@ func Open(path string) (*DB, error) {
 	// Una única conexión: el estado es local y secuencial; sin concurrencia
 	// que justifique un pool.
 	sqlDB.SetMaxOpenConns(1)
+	if err := checkSchemaVersion(sqlDB, path); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 	if _, err := sqlDB.Exec(schema); err != nil {
 		_ = sqlDB.Close()
 		return nil, errs.New(errs.KindInternal,
 			fmt.Sprintf("no se pudo preparar la base de datos %s: %v", path, err), "")
 	}
+	if _, err := sqlDB.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion)); err != nil {
+		_ = sqlDB.Close()
+		return nil, errs.New(errs.KindInternal,
+			fmt.Sprintf("no se pudo fijar la versión de esquema de la base %s: %v", path, err), "")
+	}
 	return &DB{sql: sqlDB}, nil
+}
+
+// checkSchemaVersion se asegura de que el fichero es una base de este
+// programa: una base marcada con otra versión se rechaza nombrando el
+// fichero y la versión, y un SQLite válido ajeno (tablas, user_version 0)
+// también. Sólo un fichero recién creado por nosotros —vacío o con las
+// tablas del esquema— se inicializa y se marca.
+func checkSchemaVersion(sqlDB *sql.DB, path string) error {
+	var version int
+	if err := sqlDB.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		return errs.New(errs.KindInternal,
+			fmt.Sprintf("no se pudo leer la versión de esquema de la base %s: %v", path, err), "")
+	}
+	switch {
+	case version == schemaVersion:
+		return nil
+	case version > schemaVersion:
+		return errs.New(errs.KindInternal,
+			fmt.Sprintf("la base de datos %s fue escrita con el esquema %d y esta versión del programa soporta hasta el %d: no se toca", path, version, schemaVersion),
+			"actualiza el programa o revisa el fichero a mano")
+	case version != 0:
+		return errs.New(errs.KindInternal,
+			fmt.Sprintf("la base de datos %s declara una versión de esquema (%d) que no es de este programa", path, version),
+			"comprueba el fichero a mano; no se adopta una base ajena")
+	}
+	// user_version 0: ¿el fichero es nuestro recién creado (vacío) o un
+	// SQLite de otro programa? Las tablas del esquema se crean más abajo,
+	// así que tablas presentes aquí significan base ajena.
+	var tables int
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).Scan(&tables); err != nil {
+		return errs.New(errs.KindInternal,
+			fmt.Sprintf("no se pudo inspeccionar la base de datos %s: %v", path, err), "")
+	}
+	if tables > 0 {
+		return errs.New(errs.KindInternal,
+			fmt.Sprintf("el fichero %s es una base SQLite que no es de hipoteca-cli (tiene tablas y declara user_version 0)", path),
+			"comprueba el fichero a mano; no se adopta una base ajena")
+	}
+	return nil
 }
 
 // Close cierra la base.

@@ -175,7 +175,7 @@ func Check(ctx context.Context, deps Deps) ([]Notification, error) {
 			if err != nil {
 				return events, err
 			}
-			if err := deliver(deps, w.Sink, n); err != nil {
+			if err := deliver(ctx, deps, w.Sink, n); err != nil {
 				return events, err
 			}
 			if err := deps.DB.MarkDelivered(w.ID, s.Month, now); err != nil {
@@ -206,7 +206,7 @@ func Check(ctx context.Context, deps Deps) ([]Notification, error) {
 		if err != nil {
 			return events, err
 		}
-		if err := deliver(deps, w.Sink, n); err != nil {
+		if err := deliver(ctx, deps, w.Sink, n); err != nil {
 			return events, err
 		}
 		if err := deps.DB.MarkDelivered(w.ID, month, now); err != nil {
@@ -276,10 +276,11 @@ func (d Deps) buildNotification(w store.Watch, idx bde.Index, month, value strin
 	return n, nil
 }
 
-// deliver resuelve el sink nombrado y entrega el aviso. El sink se resuelve
-// aquí, en el último momento: un sink mal configurado no estorba mientras no
-// haya nada que entregar (decisión 5).
-func deliver(deps Deps, sinkName string, n Notification) error {
+// deliver resuelve el sink nombrado y entrega el aviso con el contexto del
+// llamador: una cancelación (Ctrl+C) debe poder abortar una entrega en
+// vuelo. El sink se resuelve aquí, en el último momento: un sink mal
+// configurado no estorba mientras no haya nada que entregar (decisión 5).
+func deliver(ctx context.Context, deps Deps, sinkName string, n Notification) error {
 	if deps.SinkFor == nil {
 		return errs.New(errs.KindInternal, "no hay forma de resolver el sink del aviso", "")
 	}
@@ -287,5 +288,5 @@ func deliver(deps Deps, sinkName string, n Notification) error {
 	if err != nil {
 		return err
 	}
-	return sink.Deliver(context.Background(), n)
+	return sink.Deliver(ctx, n)
 }
