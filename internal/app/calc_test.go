@@ -7,10 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/model"
 )
+
+// fechaEjecucion es la fecha fija que los tests pasan a Calc: la fecha de
+// elaboración que la atribución debe llevar.
+var fechaEjecucion = time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC)
 
 // calcInput es la parte de los casos de referencia de testdata/finance que
 // este test necesita: las entradas y las cifras esperadas al céntimo.
@@ -60,7 +65,7 @@ func TestCalcReproduceLosCasosDeReferencia(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tipo del caso: %v", err)
 			}
-			res, err := Calc(principal, rate, c.Inputs.TermMonths)
+			res, err := Calc(principal, rate, c.Inputs.TermMonths, fechaEjecucion)
 			if err != nil {
 				t.Fatalf("Calc: %v", err)
 			}
@@ -87,16 +92,38 @@ func TestCalcReproduceLosCasosDeReferencia(t *testing.T) {
 			if res.Inputs.TermMonths != c.Inputs.TermMonths {
 				t.Errorf("inputs.term_months = %d, se esperaba %d", res.Inputs.TermMonths, c.Inputs.TermMonths)
 			}
-			// Atribución de datos procesados (P-05), fechada al día de
-			// verificación del catálogo: calc no consulta la red.
-			want, err := model.ProcessedAttribution(catalogVerifiedAt)
+			// Atribución de datos procesados (P-05), fechada al día de la
+			// ejecución: calc no consulta ningún dato del Banco, así que su
+			// data_updated_at es la fecha de elaboración, no la de los datos.
+			want, err := model.ProcessedAttribution("2026-02-14")
 			if err != nil {
 				t.Fatalf("construir la atribución esperada: %v", err)
 			}
 			if res.Attribution != want {
-				t.Errorf("attribution = %+v, se esperaba la de datos procesados con data_updated_at %s: %+v", res.Attribution, catalogVerifiedAt, want)
+				t.Errorf("attribution = %+v, se esperaba la de datos procesados con data_updated_at %s: %+v", res.Attribution, "2026-02-14", want)
 			}
 		})
+	}
+}
+
+// data_updated_at de calc es la fecha de elaboración del resultado (el día de
+// la ejecución, en UTC), no la de ningún dato: calc no consulta al Banco de
+// España. La hora de entrada no es UTC y cruza la medianoche al normalizar:
+// debe ganar el día UTC.
+func TestCalcDataUpdatedAtEsLaFechaDeEjecucion(t *testing.T) {
+	principal, _ := model.NewDecimal("10000")
+	rate, _ := model.NewDecimal("3.10")
+	// 23:30 del 14 de febrero en UTC-2 ya es el 15 de febrero en UTC.
+	now := time.Date(2026, 2, 14, 23, 30, 0, 0, time.FixedZone("UTC-2", -2*3600))
+	res, err := Calc(principal, rate, 120, now)
+	if err != nil {
+		t.Fatalf("Calc: %v", err)
+	}
+	if res.Attribution.DataUpdatedAt != "2026-02-15" {
+		t.Errorf("data_updated_at = %q, se esperaba 2026-02-15 (día de la ejecución en UTC)", res.Attribution.DataUpdatedAt)
+	}
+	if !res.Attribution.NotEndorsed {
+		t.Error("not_endorsed debe ser true (P-05)")
 	}
 }
 
@@ -118,7 +145,7 @@ func TestCalcErroresDeEntradaSonUsage(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := Calc(tc.principal, rate, tc.months)
+			_, err := Calc(tc.principal, rate, tc.months, fechaEjecucion)
 			var e *errs.Error
 			if !errors.As(err, &e) {
 				t.Fatalf("el error debe llevar el sobre del contrato, got %v", err)

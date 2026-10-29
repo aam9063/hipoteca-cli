@@ -185,6 +185,24 @@ func TestLatestCatorceIndices(t *testing.T) {
 	}
 }
 
+// El User-Agent es sustituible (CMD-01): con la versión inyectada, la petición
+// lleva hipoteca-cli/<versión> y ya no el "dev" por defecto.
+func TestUserAgentLlevaLaVersionInyectada(t *testing.T) {
+	ts, c := newFixtureClient(t, fixture(t, "favoritas-14-indices.json"), 0)
+	c.SetUserAgent("hipoteca-cli/1.2.3")
+	if got := c.UserAgent(); got != "hipoteca-cli/1.2.3" {
+		t.Fatalf("UserAgent() = %q, se esperaba hipoteca-cli/1.2.3", got)
+	}
+	if _, err := c.LatestCodes(context.Background(), codigosCatorce); err != nil {
+		t.Fatalf("LatestCodes: %v", err)
+	}
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	if ts.agent != "hipoteca-cli/1.2.3" {
+		t.Fatalf("User-Agent enviado = %q, se esperaba hipoteca-cli/1.2.3", ts.agent)
+	}
+}
+
 // TestLatestAuxiliares: el fixture mezcla éxito y error por elemento en el
 // mismo array; los D_1TFECHABOE* no salen del catálogo → not_found/4, y las
 // tres series auxiliares llegan como decimales exactos de escala 0.

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
@@ -21,7 +22,7 @@ func newCalcCmd() *cobra.Command {
 			for _, name := range []string{"principal", "rate", "months"} {
 				if !flags.Changed(name) {
 					return errs.New(errs.KindUsage,
-						fmt.Sprintf("falta --%s: indícalos los tres", name),
+						fmt.Sprintf("falta --%s: indica los tres", name),
 						"ejemplo: hipoteca calc --principal 150000 --rate 3.10 --months 300")
 				}
 			}
@@ -42,7 +43,9 @@ func newCalcCmd() *cobra.Command {
 					"usa el tipo nominal anual en tanto por ciento, p. ej. 3.10")
 			}
 
-			res, err := app.Calc(principal, rate, months)
+			// La atribución lleva la fecha de elaboración: el día de la
+			// ejecución, en UTC (Calc no consulta ningún dato del Banco).
+			res, err := app.Calc(principal, rate, months, time.Now())
 			if err != nil {
 				return err
 			}

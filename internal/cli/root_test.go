@@ -3,9 +3,14 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"io"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/aam9063/hipoteca-cli/internal/app"
+	"github.com/aam9063/hipoteca-cli/internal/bde"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 )
 
@@ -140,6 +145,77 @@ func TestUnknownFlagIsAUsageError(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Errorf("stdout must stay empty, got %q", stdout.String())
+	}
+}
+
+// TestVersionInyectadaAlcanzaElRuntime prueba la costura del cableado: el
+// BuildInfo que main inyecta (versión con -ldflags) tiene que llegar a la
+// construcción del runtime, que es quien se la pasa al cliente del Banco;
+// sin esta prueba, un cambio de firma en Deps perdería la versión en
+// silencio. Sustituye la construcción del runtime por un capturador: ningún
+// test toca configuración ni red.
+func TestVersionInyectadaAlcanzaElRuntime(t *testing.T) {
+	original := newRuntime
+	capturada := ""
+	newRuntime = func(version string) (*app.Runtime, error) {
+		capturada = version
+		return nil, errs.New(errs.KindUsage, "parada por el test", "")
+	}
+	t.Cleanup(func() { newRuntime = original })
+
+	cmd := NewRootCmdWithDeps(BuildInfo{Version: "1.2.3", Commit: "none", Date: "none"}, Deps{})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"index", "list"}) // este subcomando es el primero que resuelve el runtime
+	_ = cmd.Execute()                      // el error del capturador es lo de menos: sólo importa la versión
+
+	if capturada != "1.2.3" {
+		t.Errorf("app.NewRuntime recibió la versión %q, se esperaba %q", capturada, "1.2.3")
+	}
+}
+
+// TestLaVersionInyectadaLlegaAlCliente prueba el cableado completo con el
+// runtime de producción: la versión que entra en app.NewRuntime tiene que
+// salir como User-Agent del cliente real del Banco, no como el "dev" por
+// defecto. Los directorios de configuración y caché van a un temporal del
+// test: nada toca el perfil del usuario y ninguna petición sale de la máquina.
+func TestLaVersionInyectadaLlegaAlCliente(t *testing.T) {
+	base := t.TempDir()
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("AppData", base)
+		t.Setenv("LocalAppData", base)
+	case "darwin":
+		t.Setenv("HOME", base)
+	default:
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(base, "config"))
+		t.Setenv("XDG_CACHE_HOME", filepath.Join(base, "cache"))
+	}
+
+	rt, err := app.NewRuntime("1.2.3")
+	if err != nil {
+		t.Fatalf("NewRuntime: %v", err)
+	}
+	client, ok := rt.Source.(*bde.HTTPClient)
+	if !ok {
+		t.Fatalf("el Source del runtime no es *bde.HTTPClient: %T", rt.Source)
+	}
+	if got := client.UserAgent(); got != "hipoteca-cli/1.2.3" {
+		t.Errorf("User-Agent del cliente = %q, se esperaba hipoteca-cli/1.2.3 (no el valor por defecto)", got)
+	}
+
+	// Sin versión (binario sin -ldflags) el cliente no puede enviar un
+	// User-Agent vacío: es el "dev" por defecto.
+	rtDev, err := app.NewRuntime("")
+	if err != nil {
+		t.Fatalf("NewRuntime sin versión: %v", err)
+	}
+	clientDev, ok := rtDev.Source.(*bde.HTTPClient)
+	if !ok {
+		t.Fatalf("el Source del runtime no es *bde.HTTPClient: %T", rtDev.Source)
+	}
+	if got := clientDev.UserAgent(); got != "hipoteca-cli/dev" {
+		t.Errorf("User-Agent sin versión = %q, se esperaba hipoteca-cli/dev", got)
 	}
 }
 
