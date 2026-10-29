@@ -4,8 +4,40 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 )
+
+// TestE2ERevisionFijaRespondeUsage: un préstamo fijo no tiene revisiones de
+// tipo; `revision` no calcula nada y responde usage/2 nombrando el tipo del
+// contrato, con el stdout vacío (verificador de FIN-04, major 1).
+func TestE2ERevisionFijaRespondeUsage(t *testing.T) {
+	deps := depsConConfig(t, &stubSource{}, func(path string) {
+		initialPeriod := 12
+		offset := 2
+		sinSuelo := ""
+		l := loan.Loan{
+			Name: "Casa", Type: loan.TypeFija, StartDate: "2021-06-01",
+			OriginalPrincipal: "180000.00", TermMonths: 360, PaymentDay: 1,
+			InitialRate: "1.25", InitialPeriodMonths: &initialPeriod,
+			Index: "euribor-1y", Spread: "0.89", RevisionEveryMonths: 12,
+			ReferenceOffsetMonths: &offset, FloorRate: &sinSuelo,
+			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
+			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
+		}
+		if err := app.LoanAdd(path, "casa", l); err != nil {
+			t.Fatalf("setup: loan add: %v", err)
+		}
+	})
+
+	stdout, _, err := runRoot(t, deps, "revision", "casa")
+	e := assertContractError(t, err, errs.KindUsage, 2)
+	assertEmpty(t, "stdout", stdout)
+	if !strings.Contains(e.Message, "fijo") || !strings.Contains(e.Message, "1.25") {
+		t.Errorf("el mensaje debe decir que el préstamo es fijo y nombrar el tipo del contrato: %q", e.Message)
+	}
+}
 
 // TestE2ERevisionYScheduleSinPrestamo: sin ningún préstamo guardado,
 // `revision` y `schedule` mantienen la respuesta honesta del stub de CMD-01

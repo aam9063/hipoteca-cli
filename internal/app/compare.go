@@ -8,6 +8,7 @@ import (
 	"github.com/aam9063/hipoteca-cli/internal/bde"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/finance"
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 	"github.com/aam9063/hipoteca-cli/internal/model"
 	"github.com/shopspring/decimal"
 )
@@ -35,7 +36,10 @@ type CompareIndexBlock struct {
 // CompareRevision es una revisión de un bloque: el periodo al que pertenece,
 // su fecha y su mes de referencia (vacíos en el camino sin préstamo guardado,
 // que no inventa un calendario), el valor del índice usado, el TIN resultante
-// y la cuota del periodo.
+// y la cuota del periodo. Assumed marca lo que NO es la historia real del
+// préstamo: los valores supuestos por el usuario (P-06) y, en un préstamo
+// fijo, las revisiones del bloque propio, que son una recomposición
+// hipotética porque el contrato no tiene revisiones de tipo.
 type CompareRevision struct {
 	Period         int           `json:"period"`
 	RevisionDate   string        `json:"revision_date,omitempty"`
@@ -259,8 +263,22 @@ func Compare(ctx context.Context, rt *Runtime, p CompareParams) (CompareResult, 
 		comparables = append(comparables, b)
 	}
 	if len(comparables) == 0 {
+		// Un préstamo sin revisiones dentro del plazo no tiene nada que
+		// comparar; si la primera revisión queda fuera de la ventana, es cosa
+		// de la ventana; si su mes de referencia no está publicado en los dos
+		// índices, se nombra: distinguir "futuro, esperar publicación" de un
+		// hueco real (que sigue siendo index_not_published) (cierre FIN-04).
+		if len(boundaries) == 0 {
+			return CompareResult{}, errs.New(errs.KindUsage,
+				"el préstamo no tiene ninguna revisión dentro del plazo: no hay nada que comparar", "")
+		}
+		if !to.IsZero() && monthKeyDe(addMonths(start, boundaries[0], l.PaymentDay)) > monthKeyDe(to) {
+			return CompareResult{}, errs.New(errs.KindUsage,
+				"la ventana no cubre ninguna revisión publicada", "")
+		}
+		primera := referenceMonthDe(start, boundaries[0], l.PaymentDay, offset)
 		return CompareResult{}, errs.New(errs.KindUsage,
-			"no hay ninguna revisión cuyo mes de referencia esté publicado en los dos índices: no hay nada que comparar", "")
+			fmt.Sprintf("no hay ninguna revisión comparable: el mes de referencia %s de la primera revisión aún no está publicado en los dos índices", primera.Format("2006-01")), "")
 	}
 	// El recálculo termina en la siguiente revisión tras la última comparada
 	// (o el fin del plazo): los meses posteriores dependen de índices sin
@@ -335,13 +353,23 @@ func Compare(ctx context.Context, rt *Runtime, p CompareParams) (CompareResult, 
 	ownBlock.Revisions = seleccionarRevisiones(ownBlock.Revisions, included)
 	altBlock.Revisions = seleccionarRevisiones(altBlock.Revisions, included)
 
-	// Cobertura del periodo comparado y aviso cuando el plazo sigue más
-	// allá: sin proyección (P-06).
+	// Cobertura del periodo comparado y avisos. Un préstamo fijo no tiene
+	// revisiones de tipo: el bloque propio es una recomposición hipotética
+	// ("¿qué habría pasado si hubiera sido variable?"), no su historia
+	// (verificador de FIN-04, major 2). Y si el plazo sigue más allá del
+	// periodo publicado, se dice: sin proyección (P-06).
 	cobertura := CompareCoverage{
 		From: referenceMonthDe(start, comparables[0], l.PaymentDay, offset).Format("2006-01"),
 		To:   referenceMonthDe(start, comparables[len(comparables)-1], l.PaymentDay, offset).Format("2006-01"),
 	}
 	warnings := []string{}
+	if l.Type == loan.TypeFija {
+		for i := range ownBlock.Revisions {
+			ownBlock.Revisions[i].Assumed = true
+		}
+		warnings = append(warnings,
+			"el préstamo es a tipo fijo: no tiene revisiones de tipo, así que el bloque propio es una recomposición hipotética con el índice de la escritura y no su historia (P-06)")
+	}
 	if cutEnd < l.TermMonths {
 		warnings = append(warnings,
 			fmt.Sprintf("la comparación cubre sólo el periodo publicado por el Banco de España (meses de referencia de %s a %s): el resto del plazo no se proyecta (P-06)", cobertura.From, cobertura.To))
