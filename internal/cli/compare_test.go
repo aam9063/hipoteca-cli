@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -50,10 +51,15 @@ func (s mapSource) History(_ context.Context, id string, _ bde.Rango) (bde.Serie
 
 // serieDe construye un histórico ascendente de prueba con los meses dados.
 func serieDe(code string, meses map[string]string) bde.Series {
-	obs := make([]bde.Observation, 0, len(meses))
-	for mes, valor := range meses {
+	claves := make([]string, 0, len(meses))
+	for mes := range meses {
+		claves = append(claves, mes)
+	}
+	sort.Strings(claves) // la API entrega la serie en orden; el mapa no
+	obs := make([]bde.Observation, 0, len(claves))
+	for _, mes := range claves {
 		m, _ := time.Parse("2006-01", mes)
-		v, err := model.NewDecimal(valor)
+		v, err := model.NewDecimal(meses[mes])
 		if err != nil {
 			panic(err)
 		}
@@ -117,6 +123,70 @@ func TestE2ECompareComparaSinRecomendar(t *testing.T) {
 
 	// P-08 extendido (decisión 3 de FIN-04): ninguna palabra de
 	// asesoramiento, ni en español ni en inglés.
+	lower := strings.ToLower(stdout)
+	for _, palabra := range []string{"conviene", "mejor", "recomend", "deberías", "ganador", "winner"} {
+		if strings.Contains(lower, palabra) {
+			t.Errorf("la salida contiene la palabra prohibida %q:\n%s", palabra, stdout)
+		}
+	}
+}
+
+// TestE2ECompareFijaEsHipotesis: comparar un préstamo fijo es responder
+// "¿qué habría pasado si hubiera sido variable?"; el bloque propio va
+// marcado assumed y la salida avisa de que es una recomposición hipotética
+// (verificador de FIN-04, major 2).
+func TestE2ECompareFijaEsHipotesis(t *testing.T) {
+	src := mapSource{series: map[string]bde.Series{
+		"D_1NBAF472": serieDe("D_1NBAF472", map[string]string{
+			"2024-11": "2.506", "2025-11": "2.217", "2026-09": "3.247",
+		}),
+		"D_1T9H0000": serieDe("D_1T9H0000", map[string]string{
+			"2024-11": "3.206", "2025-11": "2.807", "2026-09": "3.189",
+		}),
+	}}
+	deps := depsConConfig(t, src, func(path string) {
+		initialPeriod := 12
+		offset := 2
+		sinSuelo := ""
+		l := loan.Loan{
+			Name: "Casa", Type: loan.TypeFija, StartDate: "2024-01-01",
+			OriginalPrincipal: "150000.00", TermMonths: 36, PaymentDay: 1,
+			InitialRate: "2.00", InitialPeriodMonths: &initialPeriod,
+			Index: "euribor-1y", Spread: "0.50", RevisionEveryMonths: 12,
+			ReferenceOffsetMonths: &offset, FloorRate: &sinSuelo,
+			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
+			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
+		}
+		if err := app.LoanAdd(path, "casa", l); err != nil {
+			t.Fatalf("setup: loan add: %v", err)
+		}
+	})
+
+	stdout, stderr, err := runRoot(t, deps, "compare", "casa", "--index", "irph", "--spread", "1.00")
+	if err != nil {
+		t.Fatalf("compare de un fijo debe tener éxito, got %v (stderr: %s)", err, stderr)
+	}
+	assertEmpty(t, "stderr", stderr)
+	assertSingleJSON(t, stdout)
+
+	var res app.CompareResult
+	if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+		t.Fatalf("el stdout no es el JSON del contrato: %v\n%s", err, stdout)
+	}
+	if len(res.Own.Revisions) == 0 {
+		t.Fatal("el bloque propio debe seguir trayendo las revisiones hipotéticas")
+	}
+	for _, rev := range res.Own.Revisions {
+		if !rev.Assumed {
+			t.Errorf("las revisiones del bloque propio de un fijo deben ser assumed: %+v", rev)
+		}
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "fijo") ||
+		!strings.Contains(res.Warnings[0], "hipot") || !strings.Contains(res.Warnings[0], "P-06") {
+		t.Errorf("warnings = %v, want el aviso de recomposición hipotética (P-06)", res.Warnings)
+	}
+
+	// P-08 sigue protegiendo la salida: ninguna palabra de asesoramiento.
 	lower := strings.ToLower(stdout)
 	for _, palabra := range []string{"conviene", "mejor", "recomend", "deberías", "ganador", "winner"} {
 		if strings.Contains(lower, palabra) {
