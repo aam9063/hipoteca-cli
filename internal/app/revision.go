@@ -138,7 +138,8 @@ func Revision(ctx context.Context, rt *Runtime, p RevisionParams) (RevisionResul
 	// Mes de referencia y valor del índice.
 	offset := *l.ReferenceOffsetMonths
 	refMonth := finance.ReferenceMonth(revisionDate, offset)
-	var warnings []string
+	// §5.2: sin avisos, warnings es una lista vacía, no null.
+	warnings := []string{}
 	var indexValue decimal.Decimal
 	var updatedAt string
 	indexBlock := RevisionIndexBlock{

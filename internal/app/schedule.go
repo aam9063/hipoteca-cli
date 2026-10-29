@@ -91,7 +91,8 @@ func Schedule(p ScheduleParams) (ScheduleResult, error) {
 	}
 
 	var baseDate time.Time
-	var warnings []string
+	// §5.2: sin avisos, warnings es una lista vacía, no null.
+	warnings := []string{}
 	if l.Sync != nil {
 		// El recibo ya cobró la cuota de su mes: la primera cuota del cuadro
 		// es la del mes siguiente.

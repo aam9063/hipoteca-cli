@@ -241,7 +241,7 @@ func TestLoanEditAplicaYCambia(t *testing.T) {
 func TestLoanRemoveConConfirmacion(t *testing.T) {
 	path := configCon(t, map[string]loan.Loan{"casa": prestamoCompleto()})
 
-	err := LoanRemove(path, "casa", false)
+	_, err := LoanRemove(path, "casa", false)
 	e := assertAppError(t, err, errs.KindConfirmationRequired, 2)
 	if !containsAll(e.Hint, "--yes") {
 		t.Fatalf("el hint debe apuntar a --yes: %q", e.Hint)
@@ -251,7 +251,7 @@ func TestLoanRemoveConConfirmacion(t *testing.T) {
 		t.Fatalf("el préstamo debía seguir guardado: %v", err)
 	}
 
-	if err := LoanRemove(path, "casa", true); err != nil {
+	if _, err := LoanRemove(path, "casa", true); err != nil {
 		t.Fatalf("LoanRemove() con confirmación: %v", err)
 	}
 	_, err = LoanShow(path, "casa")
@@ -346,8 +346,45 @@ func TestRevisionSinPrestamosPreservaElStub(t *testing.T) {
 	if !containsAll(e.Hint, "loan add") {
 		t.Fatalf("el hint debe apuntar a \"loan add\": %q", e.Hint)
 	}
+	// El hint ya no cita una tarea: apunta al comando que arregla el estado.
+	if containsAll(e.Hint, "LOAN-01") {
+		t.Fatalf("el hint no debe citar una tarea interna: %q", e.Hint)
+	}
 	_, err = Schedule(ScheduleParams{ConfigPath: path})
 	assertAppError(t, err, errs.KindLoanIncomplete, 2)
+}
+
+// TestLoanRemoveIdOpcional: con un único préstamo guardado, omitir el id
+// borra ése (LOAN-01.4), siempre con --yes: sin ella nada se toca. Con
+// varios préstamos y sin id, usage/2 listando los ids.
+func TestLoanRemoveIdOpcional(t *testing.T) {
+	solo := configCon(t, map[string]loan.Loan{"casa": prestamoCompleto()})
+
+	// Sin --yes: confirmation_required/2 y el préstamo sigue intacto.
+	_, err := LoanRemove(solo, "", false)
+	assertAppError(t, err, errs.KindConfirmationRequired, 2)
+	if _, err := LoanShow(solo, "casa"); err != nil {
+		t.Fatalf("el préstamo debía seguir guardado: %v", err)
+	}
+
+	// Con --yes y un único préstamo: se borra ése.
+	id, err := LoanRemove(solo, "", true)
+	if err != nil || id != "casa" {
+		t.Fatalf("LoanRemove() sin id = %q, %v; want casa, nil", id, err)
+	}
+	_, err = LoanShow(solo, "casa")
+	assertAppError(t, err, errs.KindNotFound, 4)
+
+	// Con varios préstamos y sin id: usage/2 listando los ids.
+	varios := configCon(t, map[string]loan.Loan{
+		"casa": prestamoCompleto(),
+		"piso": prestamoCompleto(),
+	})
+	_, err = LoanRemove(varios, "", true)
+	e := assertAppError(t, err, errs.KindUsage, 2)
+	if !containsAll(e.Message, "casa", "piso") {
+		t.Fatalf("el error debe listar los ids: %q", e.Message)
+	}
 }
 
 // assertAppError comprueba el sobre del contrato (kind y código).
