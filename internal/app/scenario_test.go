@@ -199,6 +199,10 @@ func TestScenarioErroresDeEntradaSonUsage(t *testing.T) {
 			if e.Kind != errs.KindUsage {
 				t.Errorf("kind = %q, se esperaba usage (mensaje: %s)", e.Kind, e.Message)
 			}
+			// El prefijo del paquete interno no es lenguaje de usuario.
+			if strings.Contains(e.Message, "finance:") {
+				t.Errorf("el mensaje no debe filtrar el prefijo interno \"finance:\": %s", e.Message)
+			}
 			if errs.ExitCode(e.Kind) != 2 {
 				t.Errorf("código de salida = %d, se esperaba 2", errs.ExitCode(e.Kind))
 			}

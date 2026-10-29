@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
@@ -50,14 +51,18 @@ type AmortizeOutcome struct {
 	MonthsSaved    int           `json:"months_saved"`
 
 	// ClosesAtEvent marca el cierre M1 (FIN-03): el importe agotó el saldo y
-	// el préstamo termina EN el evento. PaymentAfter queda en 0.00 y
-	// TermAfter en el mes del evento: ninguna cuota posterior existe y la
-	// salida no inventa una última fila que no se cobra.
+	// el préstamo termina EN el evento. Lo que guarda PaymentAfter depende del
+	// modo: en reduce-payment es 0.00 porque no queda plazo sobre el que
+	// recalcular una cuota; en reduce-term es la cuota mantenida, que es la
+	// del propio mes del evento y sí se cobró. En ambos casos el cuadro
+	// termina en el mes del evento (TermAfter = AfterMonth): después del
+	// evento no existe ninguna cuota y la salida no inventa una.
 	ClosesAtEvent *EventClose `json:"closes_at_event,omitempty"`
 }
 
 // EventClose es el marcador explícito del cierre por el evento: el mes en el
-// que la amortización agotó el saldo.
+// que la amortización agotó el saldo, con el importe y el saldo justo antes
+// del evento (BalanceAfter del bloque queda en 0.00).
 type EventClose struct {
 	AfterMonth    int           `json:"after_month"`
 	Amount        model.Decimal `json:"amount"`
@@ -142,18 +147,18 @@ func prepay(in AmortizeInputs, mode finance.Mode) (AmortizeOutcome, error) {
 	}
 	out := AmortizeOutcome{
 		Mode:           string(mode),
-		Amount:         model.FromDecimal(pre.Amount),
-		Fee:            model.FromDecimal(pre.Fee),
-		Outlay:         model.FromDecimal(pre.Outlay),
-		BalanceBefore:  model.FromDecimal(pre.BalanceBefore),
-		BalanceAfter:   model.FromDecimal(pre.BalanceAfter),
-		PaymentBefore:  model.FromDecimal(pre.PaymentBefore),
-		PaymentAfter:   model.FromDecimal(pre.PaymentAfter),
+		Amount:         model.NewMoney(pre.Amount),
+		Fee:            model.NewMoney(pre.Fee),
+		Outlay:         model.NewMoney(pre.Outlay),
+		BalanceBefore:  model.NewMoney(pre.BalanceBefore),
+		BalanceAfter:   model.NewMoney(pre.BalanceAfter),
+		PaymentBefore:  model.NewMoney(pre.PaymentBefore),
+		PaymentAfter:   model.NewMoney(pre.PaymentAfter),
 		TermBefore:     pre.TermBefore,
 		TermAfter:      pre.TermAfter,
-		InterestBefore: model.FromDecimal(pre.InterestBefore),
-		InterestAfter:  model.FromDecimal(pre.InterestAfter),
-		InterestSaved:  model.FromDecimal(pre.InterestSaved),
+		InterestBefore: model.NewMoney(pre.InterestBefore),
+		InterestAfter:  model.NewMoney(pre.InterestAfter),
+		InterestSaved:  model.NewMoney(pre.InterestSaved),
 		MonthsSaved:    pre.MonthsSaved,
 	}
 	// M1 (FIN-03): el cuadro cierra por el evento. La salida lo marca de forma
@@ -163,11 +168,18 @@ func prepay(in AmortizeInputs, mode finance.Mode) (AmortizeOutcome, error) {
 	if pre.BalanceAfter.IsZero() {
 		out.ClosesAtEvent = &EventClose{
 			AfterMonth:    pre.AfterMonth,
-			Amount:        model.FromDecimal(pre.Amount),
-			BalanceBefore: model.FromDecimal(pre.BalanceBefore),
+			Amount:        model.NewMoney(pre.Amount),
+			BalanceBefore: model.NewMoney(pre.BalanceBefore),
 		}
 	}
 	return out, nil
+}
+
+// sinPrefijoFinance quita el prefijo "finance: " de los mensajes de los
+// centinelas del paquete interno: el usuario lee el hecho y el hint, no el
+// nombre de nuestro paquete (verificador, nit 3).
+func sinPrefijoFinance(msg string) string {
+	return strings.ReplaceAll(msg, "finance: ", "")
 }
 
 // amortizeUsageError traduce las validaciones de finance a errores de uso del
@@ -182,15 +194,16 @@ func amortizeUsageError(err error) error {
 	case errors.Is(err, finance.ErrNegativeFeePct):
 		msg = "la comisión no puede ser negativa"
 	case errors.Is(err, finance.ErrAfterMonthOutsideSchedule):
-		msg = fmt.Sprintf("el mes del evento no es una cuota del cuadro: %v", err)
+		msg = sinPrefijoFinance(err.Error())
 	case errors.Is(err, finance.ErrAmountExceedsBalance):
-		msg = fmt.Sprintf("el importe supera el capital pendiente en ese mes: %v", err)
+		msg = sinPrefijoFinance(err.Error())
 	case errors.Is(err, finance.ErrNegativePrincipal):
 		msg = "el capital no puede ser negativo"
 	case errors.Is(err, finance.ErrZeroMonths), errors.Is(err, finance.ErrNegativeMonths):
 		msg = "el plazo debe ser de al menos un mes"
 	case errors.Is(err, finance.ErrUnpayableSchedule):
-		msg = fmt.Sprintf("con estas entradas no hay un plan de amortización que representar: %v", err)
+		msg = fmt.Sprintf("con estas entradas no hay un plan de amortización que representar: %s",
+			sinPrefijoFinance(err.Error()))
 	default:
 		return err
 	}

@@ -85,12 +85,14 @@ func Scenario(in ScenarioInputs, indexValues []model.Decimal, now time.Time) (Sc
 			return ScenarioResult{}, scenarioUsageError(err)
 		}
 		values = append(values, ScenarioValue{
-			IndexValue:    v,
-			Assumed:       true,
+			IndexValue: v,
+			Assumed:    true,
+			// La cuota y los totales son dinero: siempre a dos decimales en el
+			// JSON, aunque sean 0.00. El TIN es un tipo: conserva su escala.
 			AnnualRatePct: model.FromDecimal(rate.Final),
-			Payment:       model.FromDecimal(schedule.Rows[0].Payment),
-			TotalInterest: model.FromDecimal(schedule.TotalInterest),
-			TotalPaid:     model.FromDecimal(schedule.TotalPaid),
+			Payment:       model.NewMoney(schedule.Rows[0].Payment),
+			TotalInterest: model.NewMoney(schedule.TotalInterest),
+			TotalPaid:     model.NewMoney(schedule.TotalPaid),
 		})
 	}
 	return ScenarioResult{
@@ -107,13 +109,16 @@ func scenarioUsageError(err error) error {
 	var msg string
 	switch {
 	case errors.Is(err, finance.ErrUnsupportedRateRounding):
-		msg = fmt.Sprintf("el redondeo de escritura no está soportado: %v", err)
+		// La lista de redondeos válidos es parte de la ayuda al usuario; el
+		// mensaje no incrusta la cadena del error interno.
+		msg = "el redondeo de escritura no está soportado (usa none, 1/8, 1/4 o 0.05)"
 	case errors.Is(err, finance.ErrNegativePrincipal):
 		msg = "el capital no puede ser negativo"
 	case errors.Is(err, finance.ErrZeroMonths), errors.Is(err, finance.ErrNegativeMonths):
 		msg = "el plazo debe ser de al menos un mes"
 	case errors.Is(err, finance.ErrUnpayableSchedule):
-		msg = fmt.Sprintf("con estas entradas no hay un plan de amortización que representar: %v", err)
+		msg = fmt.Sprintf("con estas entradas no hay un plan de amortización que representar: %s",
+			sinPrefijoFinance(err.Error()))
 	default:
 		return err
 	}

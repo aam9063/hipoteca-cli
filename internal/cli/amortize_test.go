@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -83,38 +84,166 @@ func TestE2EAmortizeCompareDevuelveAmbosBloquesSinRecomendar(t *testing.T) {
 	assertSingleJSON(t, stdout)
 }
 
-// El importe que agota el saldo cierra por el evento: closes_at_event en el
-// JSON y ninguna cuota fantasma después (M1 de FIN-03).
-func TestE2EAmortizeCierrePorElEvento(t *testing.T) {
+// El importe que agota el saldo cierra por el evento en los DOS modos:
+// closes_at_event con sus campos y ninguna cuota fantasma después (M1 de
+// FIN-03). En reduce-payment no hay cuota que recalcular (payment_after
+// 0.00); en reduce-term la cuota mantenida es la del propio mes del evento.
+func TestE2EAmortizeCierrePorElEventoEnAmbosModos(t *testing.T) {
 	deps := depsCon(t, &stubSource{})
-	stdout, _, err := runRoot(t, deps, "amortize",
-		"--principal", "150000", "--rate", "3.10", "--months", "300",
-		"--amount", "128506.54", "--date", "60", "--mode", "reduce-term")
-	if err != nil {
-		t.Fatalf("amortize debe tener éxito, got %v", err)
+	for _, mode := range []string{"reduce-payment", "reduce-term"} {
+		t.Run(mode, func(t *testing.T) {
+			stdout, _, err := runRoot(t, deps, "amortize",
+				"--principal", "150000", "--rate", "3.10", "--months", "300",
+				"--amount", "128506.54", "--date", "60", "--mode", mode)
+			if err != nil {
+				t.Fatalf("amortize debe tener éxito, got %v", err)
+			}
+			var res app.AmortizeResult
+			if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+				t.Fatalf("el stdout no es el JSON del contrato: %v\n%s", err, stdout)
+			}
+			out := bloquePorNombre(t, res, mode)
+			if out.ClosesAtEvent == nil {
+				t.Fatalf("la salida debe llevar closes_at_event: %+v", res)
+			}
+			if out.ClosesAtEvent.AfterMonth != 60 {
+				t.Errorf("closes_at_event.after_month = %d, se esperaba 60", out.ClosesAtEvent.AfterMonth)
+			}
+			if got := out.ClosesAtEvent.Amount.Decimal().StringFixed(2); got != "128506.54" {
+				t.Errorf("closes_at_event.amount = %s, se esperaba 128506.54", got)
+			}
+			if got := out.ClosesAtEvent.BalanceBefore.Decimal().StringFixed(2); got != "128506.54" {
+				t.Errorf("closes_at_event.balance_before_event = %s, se esperaba 128506.54", got)
+			}
+			// Ninguna cuota existe tras el evento: el plazo termina en el mes 60.
+			if out.TermAfter != 60 {
+				t.Errorf("term_months_after = %d, se esperaba 60 (sin cuotas fantasma)", out.TermAfter)
+			}
+			if got := out.BalanceAfter.Decimal().StringFixed(2); got != "0.00" {
+				t.Errorf("balance_after_event = %s, se esperaba 0.00", got)
+			}
+			wantPayment := "0.00"
+			if mode == "reduce-term" {
+				wantPayment = "719.14"
+			}
+			if got := out.PaymentAfter.Decimal().StringFixed(2); got != wantPayment {
+				t.Errorf("payment_after = %s, se esperaba %s", got, wantPayment)
+			}
+			// Dinero siempre a dos decimales en el JSON (verificador, minor 1).
+			wantJSON := `"payment_after":"` + wantPayment + `"`
+			if !strings.Contains(stdout, wantJSON) || !strings.Contains(stdout, `"balance_after_event":"0.00"`) {
+				t.Errorf("el JSON debe llevar el dinero a dos decimales:\n%s", stdout)
+			}
+		})
 	}
-	var res app.AmortizeResult
-	if err := json.Unmarshal([]byte(stdout), &res); err != nil {
-		t.Fatalf("el stdout no es el JSON del contrato: %v\n%s", err, stdout)
+}
+
+// bloquePorNombre devuelve el bloque del modo pedido.
+func bloquePorNombre(t *testing.T, res app.AmortizeResult, mode string) *app.AmortizeOutcome {
+	t.Helper()
+	if mode == "reduce-payment" {
+		if res.ReducePayment == nil {
+			t.Fatal("falta el bloque reduce_payment")
+		}
+		return res.ReducePayment
 	}
-	if res.ReduceTerm == nil || res.ReduceTerm.ClosesAtEvent == nil {
-		t.Fatalf("la salida debe llevar closes_at_event: %+v", res)
+	if res.ReduceTerm == nil {
+		t.Fatal("falta el bloque reduce_term")
 	}
-	if res.ReduceTerm.ClosesAtEvent.AfterMonth != 60 {
-		t.Errorf("closes_at_event.after_month = %d, se esperaba 60", res.ReduceTerm.ClosesAtEvent.AfterMonth)
+	return res.ReduceTerm
+}
+
+// La comisión es independiente del cálculo en los DOS modos (decisión 1 de
+// FIN-03): el mismo cálculo con --fee-pct 0, 1 y 2.005 da idénticas cuota,
+// plazo, ahorro y saldo tras el evento; sólo cambian fee y outlay.
+func TestE2EAmortizeLaComisionEsIndependienteDelCalculo(t *testing.T) {
+	deps := depsCon(t, &stubSource{})
+	bloquesPorFee := map[string]app.AmortizeResult{}
+	for _, fee := range []string{"0", "1", "2.005"} {
+		stdout, _, err := runRoot(t, deps, "amortize",
+			"--principal", "150000", "--rate", "3.10", "--months", "300",
+			"--amount", "10000", "--date", "60", "--mode", "compare", "--fee-pct", fee)
+		if err != nil {
+			t.Fatalf("amortize --fee-pct %s debe tener éxito, got %v", fee, err)
+		}
+		var res app.AmortizeResult
+		if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+			t.Fatalf("el stdout no es el JSON del contrato: %v\n%s", err, stdout)
+		}
+		bloquesPorFee[fee] = res
 	}
-	// La cuota mantenida es la del propio mes del evento, que sí se cobró: el
-	// cuadro termina ahí (term_months_after 60), sin filas fantasma después.
-	if got := res.ReduceTerm.PaymentAfter.Decimal().StringFixed(2); got != "719.14" {
-		t.Errorf("payment_after = %s, se esperaba 719.14 (la cuota del mes del evento)", got)
+	base := bloquesPorFee["0"]
+	for _, fee := range []string{"1", "2.005"} {
+		r := bloquesPorFee[fee]
+		for _, nombre := range []string{"reduce-payment", "reduce-term"} {
+			a, b := bloquePorNombre(t, base, nombre), bloquePorNombre(t, r, nombre)
+			campos := []struct {
+				nombre string
+				valor  [2]string
+			}{
+				{"payment_after", [2]string{a.PaymentAfter.Decimal().StringFixed(2), b.PaymentAfter.Decimal().StringFixed(2)}},
+				{"term_months_after", [2]string{fmt.Sprintf("%d", a.TermAfter), fmt.Sprintf("%d", b.TermAfter)}},
+				{"interest_saved", [2]string{a.InterestSaved.Decimal().StringFixed(2), b.InterestSaved.Decimal().StringFixed(2)}},
+				{"balance_after_event", [2]string{a.BalanceAfter.Decimal().StringFixed(2), b.BalanceAfter.Decimal().StringFixed(2)}},
+			}
+			for _, campo := range campos {
+				if campo.valor[0] != campo.valor[1] {
+					t.Errorf("--fee-pct %s: %s cambió en %s: %s vs %s (debe ser idéntico)",
+						fee, campo.nombre, nombre, campo.valor[0], campo.valor[1])
+				}
+			}
+		}
 	}
-	if res.ReduceTerm.TermAfter != 60 {
-		t.Errorf("term_months_after = %d, se esperaba 60", res.ReduceTerm.TermAfter)
+	// fee/outlay sí cambian, siempre a dos decimales.
+	fees := map[string][2]string{
+		"0":     {"0.00", "10000.00"},
+		"1":     {"100.00", "10100.00"},
+		"2.005": {"200.50", "10200.50"},
+	}
+	for fee, want := range fees {
+		r := bloquePorNombre(t, bloquesPorFee[fee], "reduce-payment")
+		if got := r.Fee.Decimal().StringFixed(2); got != want[0] {
+			t.Errorf("--fee-pct %s: fee = %s, se esperaba %s", fee, got, want[0])
+		}
+		if got := r.Outlay.Decimal().StringFixed(2); got != want[1] {
+			t.Errorf("--fee-pct %s: outlay = %s, se esperaba %s", fee, got, want[1])
+		}
+	}
+}
+
+// El redondeo half-up de la comisión al céntimo: el punto medio sube y lo que
+// no llega baja (0.015 → 0.02, 0.01495 → 0.01).
+func TestE2EAmortizeComisionPuntoMedio(t *testing.T) {
+	deps := depsCon(t, &stubSource{})
+	cases := []struct {
+		importe string
+		want    string
+	}{
+		{"3.00", "0.02"},
+		{"2.99", "0.01"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.importe, func(t *testing.T) {
+			stdout, _, err := runRoot(t, deps, "amortize",
+				"--principal", "150000", "--rate", "3.10", "--months", "300",
+				"--amount", tc.importe, "--date", "60", "--mode", "reduce-payment", "--fee-pct", "0.5")
+			if err != nil {
+				t.Fatalf("amortize debe tener éxito, got %v", err)
+			}
+			var res app.AmortizeResult
+			if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+				t.Fatalf("el stdout no es el JSON del contrato: %v\n%s", err, stdout)
+			}
+			if got := res.ReducePayment.Fee.Decimal().StringFixed(2); got != tc.want {
+				t.Errorf("fee = %s, se esperaba %s", got, tc.want)
+			}
+		})
 	}
 }
 
 // --date es el mes del evento (índice de cuota), no una fecha de calendario
-// (decisión 3): la ayuda de la bandera lo dice.
+// (decisión 3): la ayuda lo dice y explica qué guarda payment_after cuando el
+// préstamo cierra en el evento.
 func TestE2EAmortizeLaAyudaDeDateExplicaQueEsUnIndiceDeCuota(t *testing.T) {
 	deps := depsCon(t, &stubSource{})
 	stdout, _, err := runRoot(t, deps, "amortize", "--help")
@@ -123,6 +252,13 @@ func TestE2EAmortizeLaAyudaDeDateExplicaQueEsUnIndiceDeCuota(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "no es una fecha de calendario") {
 		t.Errorf("la ayuda de --date debe explicar que es el índice de la cuota, no una fecha:\n%s", stdout)
+	}
+	// Verificador, minor 2: payment_after significa cosas distintas en M1
+	// según el modo; la ayuda debe explicarlo.
+	for _, frase := range []string{"payment_after", "reduce-payment", "reduce-term"} {
+		if !strings.Contains(stdout, frase) {
+			t.Errorf("la ayuda debe explicar qué guarda payment_after en cada modo cuando el préstamo cierra por el evento:\n%s", stdout)
+		}
 	}
 }
 
