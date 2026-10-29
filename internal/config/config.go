@@ -34,6 +34,21 @@ type Config struct {
 	// dato del usuario y `loan show` avisa de lo que falta (LOAN-01.1);
 	// la validación estricta la aplican los comandos que calculan.
 	Loans map[string]loan.Loan `toml:"loans,omitempty"`
+	// Sinks son los destinos de avisos por nombre ([sinks.<nombre>],
+	// WATCH-01): en v1 el único tipo es "webhook" con su URL. Son datos del
+	// usuario como los préstamos: viven en la config, no en la base de
+	// estado.
+	Sinks map[string]Sink `toml:"sinks,omitempty"`
+}
+
+// Sink es un destino de avisos configurado por el usuario. En v1 el único
+// tipo soportado es "webhook": un POST JSON a URL con el aviso (P-03: por
+// defecto el aviso no lleva ningún dato del préstamo).
+type Sink struct {
+	// Type es "webhook" en v1; otro valor es rechazado al usar el sink.
+	Type string `toml:"type"`
+	// URL de destino del POST.
+	URL string `toml:"url"`
 }
 
 // Default returns the configuration to use when no file exists: the current
@@ -43,6 +58,7 @@ func Default() Config {
 		SchemaVersion: SchemaVersion,
 		Indices:       map[string]string{},
 		Loans:         map[string]loan.Loan{},
+		Sinks:         map[string]Sink{},
 	}
 }
 
@@ -78,6 +94,9 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.Loans == nil {
 		cfg.Loans = map[string]loan.Loan{}
+	}
+	if cfg.Sinks == nil {
+		cfg.Sinks = map[string]Sink{}
 	}
 	return cfg, nil
 }
