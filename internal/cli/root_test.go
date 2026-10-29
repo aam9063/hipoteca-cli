@@ -219,6 +219,25 @@ func TestLaVersionInyectadaLlegaAlCliente(t *testing.T) {
 	}
 }
 
+// CMD-02: `amortize` y `scenario` están en el árbol (piden sus banderas con un
+// error de uso, no con "subcomando desconocido") y `compare` NO está expuesto:
+// depende de FIN-04 y no se expone un comando que no puede cumplir (L1).
+func TestAmortizeYScenarioRegistradosYCompareNoExpuesto(t *testing.T) {
+	deps := depsCon(t, &stubSource{})
+	for _, args := range [][]string{{"amortize"}, {"scenario"}} {
+		_, _, err := runRoot(t, deps, args...)
+		e := assertContractError(t, err, errs.KindUsage, 2)
+		if strings.Contains(e.Message, "subcomando desconocido") {
+			t.Errorf("%q debe estar registrado en el árbol; el error dice: %s", args[0], e.Message)
+		}
+	}
+	_, _, err := runRoot(t, deps, "compare")
+	e := assertContractError(t, err, errs.KindUsage, 2)
+	if !strings.Contains(e.Message, "subcomando desconocido") {
+		t.Errorf("compare no debe estar expuesto; el error dice: %s", e.Message)
+	}
+}
+
 // The completion command is not part of the CLI contract, so asking for it must
 // fail like any other unknown command instead of writing a shell script.
 func TestCompletionCommandIsDisabled(t *testing.T) {
