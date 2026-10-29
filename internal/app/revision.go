@@ -127,9 +127,10 @@ func Revision(ctx context.Context, rt *Runtime, p RevisionParams) (RevisionResul
 
 	// Capital pendiente y cuota previa en la fecha de revisión: del recibo
 	// (sync) cuando cubre la fecha, del cuadro propio en el tramo inicial
-	// cuando no. Una revisión posterior al tramo inicial sin sync no se
-	// calcula: los índices de las revisiones intermedias no están guardados
-	// y suponerlos inventaría un capital (P-06).
+	// cuando no — y en cualquier fecha para un préstamo fijo, cuyo cuadro es
+	// exacto. Una revisión posterior al tramo inicial de un variable sin
+	// sync no se calcula: los índices de las revisiones intermedias no
+	// están guardados y suponerlos inventaría un capital (P-06).
 	balance, previousPayment, previousRate, source, err := outstandingAt(l, start, elapsed)
 	if err != nil {
 		return RevisionResult{}, err
@@ -286,11 +287,17 @@ func resolveRevisionDate(l loan.Loan, dateFlag string, now time.Time) (time.Time
 //     (outstanding_source "sync+schedule");
 //   - sin sync (o con un recibo posterior a la fecha pedida), capital y
 //     cuota vienen del cuadro propio del préstamo con su tipo inicial,
-//     válido dentro del tramo inicial (outstanding_source "schedule").
+//     válido dentro del tramo inicial (outstanding_source "schedule");
+//   - un préstamo FIJO sin sync se calcula con su cuadro propio en
+//     cualquier fecha del plazo (advisory de LOAN-01): su tipo no cambia,
+//     así que el cuadro es exacto y no hay ningún índice intermedio sin
+//     guardar que inventar.
 //
 // Entre el recibo y la revisión no puede haber otra revisión: el índice de
 // esa revisión intermedia no está guardado y suponerlo inventaría el
-// capital (P-06).
+// capital (P-06). Ese mismo motivo es el que cierra el camino del cuadro
+// propio a un VARIABLE (o mixto) más allá del tramo inicial: ahí las
+// revisiones intermedias sí habrían cambiado el tipo.
 func outstandingAt(l loan.Loan, start time.Time, elapsed int) (balance, previousPayment, previousRate decimal.Decimal, source string, err error) {
 	usageRefuse := func() error {
 		return errs.New(errs.KindUsage,
@@ -337,7 +344,10 @@ func outstandingAt(l loan.Loan, start time.Time, elapsed int) (balance, previous
 	if l.InitialPeriodMonths != nil {
 		initialPeriod = *l.InitialPeriodMonths
 	}
-	if elapsed > initialPeriod {
+	// El rechazo por falta de cobertura sólo aplica a un préstamo cuyo tipo
+	// cambia con las revisiones: en un fijo el cuadro propio es exacto en
+	// cualquier fecha (advisory de LOAN-01, decisión 4 de FIN-04).
+	if elapsed > initialPeriod && l.Type != loan.TypeFija {
 		return decimal.Decimal{}, decimal.Decimal{}, decimal.Decimal{}, "", errs.New(errs.KindUsage,
 			fmt.Sprintf("el capital pendiente en %s no se puede calcular: la revisión del mes %d no está cubierta por el tramo inicial ni por un recibo sincronizado",
 				addMonths(start, elapsed, l.PaymentDay).Format("2006-01"), elapsed),
