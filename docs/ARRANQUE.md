@@ -627,12 +627,19 @@ Prefijos: H, SPIKE, OPS, CORE, BDE, FIN, LOAN, CMD, WATCH, AGENT, QA, REL, REF.
 
 | ID | Tarea | Depende | Criterio de aceptación |
 |---|---|---|---|
-| AGENT-01 | `skills`, `schema` y `doctor` completo | Olas 2 a 4 | Un agente sin contexto resuelve las cuatro recetas de 6.5 solo con `skills get` |
+| AGENT-01 | `skills`, `schema` y `doctor` completo | Olas 2 a 3 | Un agente sin contexto resuelve las cuatro recetas de 6.5 solo con `skills get` |
 | AGENT-02 | `docs/cli-spec.md` generado; README con atribución y avisos | AGENT-01 | Referencia al día con el binario |
 | REL-01 | GoReleaser, checksums, `install.sh`, tap, Scoop, `update` | AGENT-02 | `v0.1.0` instalable en una línea |
 | QA-01 | Pase de arquitectura final | REL-01 | `odd/reviews/ola-5.md` y tareas REF |
 
 **Sugerencia de corte:** `v0.1.0` tras las Olas 1 a 3. Los avisos en `v0.2.0`.
+
+**Estado al cerrar AGENT-02:** las Olas 1 a 3 están cerradas y validadas (FIN y CMD con casos de
+referencia, más el contraste contra un recibo bancario real en H-03). `WATCH-01` y `WATCH-02`
+también están entregadas, pero pertenecen a `v0.2.0` por la decisión de corte, así que **`v0.1.0`
+no sale de `dev` tal cual**: el último commit sin avisos es `1ff3a45`. `AGENT-01` se acotó a las
+Olas 2 a 3 por esa misma decisión, para que `REL-01` no dependa de la Ola 4. Lo único que falta
+para `v0.1.0` es `REL-01`.
 
 ---
 
