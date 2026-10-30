@@ -78,8 +78,11 @@ func newIndexShowCmd(deps Deps) *cobra.Command {
 			return writeResult(cmd, res)
 		},
 	}
+	// S6 (AGENT-02): el texto es estático a propósito — sin el año en curso,
+	// que cambiaría cada 1 de enero y desfasaría la ayuda y el documento
+	// generado. parseRange sigue aceptando el año real.
 	cmd.Flags().String("range", "30M",
-		"rango del histórico: 30M, 60M, MAX o un año con datos (1990-"+strconv.Itoa(time.Now().Year())+")")
+		"rango del histórico: 30M, 60M, MAX o un año con datos (entre 1990 y el año en curso)")
 	return cmd
 }
 
