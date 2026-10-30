@@ -632,14 +632,21 @@ Prefijos: H, SPIKE, OPS, CORE, BDE, FIN, LOAN, CMD, WATCH, AGENT, QA, REL, REF.
 | REL-01 | GoReleaser, checksums, `install.sh`, tap, Scoop, `update` | AGENT-02 | `v0.1.0` instalable en una línea |
 | QA-01 | Pase de arquitectura final | REL-01 | `odd/reviews/ola-5.md` y tareas REF |
 
-**Sugerencia de corte:** `v0.1.0` tras las Olas 1 a 3. Los avisos en `v0.2.0`.
+**Sugerencia de corte (revisada):** `v0.1.0` sale de `dev` con **todo** lo entregado, avisos
+incluidos.
 
 **Estado al cerrar AGENT-02:** las Olas 1 a 3 están cerradas y validadas (FIN y CMD con casos de
 referencia, más el contraste contra un recibo bancario real en H-03). `WATCH-01` y `WATCH-02`
-también están entregadas, pero pertenecen a `v0.2.0` por la decisión de corte, así que **`v0.1.0`
-no sale de `dev` tal cual**: el último commit sin avisos es `1ff3a45`. `AGENT-01` se acotó a las
-Olas 2 a 3 por esa misma decisión, para que `REL-01` no dependa de la Ola 4. Lo único que falta
-para `v0.1.0` es `REL-01`.
+también, y **entran en `v0.1.0`**: la sugerencia original de dejarlas para `v0.2.0` era una
+estimación de esfuerzo, no una regla, y separarlas ahora exigiría reescribir historial (los
+commits de WATCH están intercalados con H-03 y AGENT-01/02, y AGENT-01 tocó código de WATCH).
+Publicar la rama más probada vale más que respetar una estimación que ya no aplica.
+
+`AGENT-01` sigue acotado a las Olas 2 a 3 en su documentación de referencia: `watch` aparece
+marcado como `v0.2.0 (previsto)` porque **esos comandos no tienen recetas de agente todavía**,
+no porque el código no se publique.
+
+Lo único que falta para `v0.1.0` es `REL-01`.
 
 ---
 
