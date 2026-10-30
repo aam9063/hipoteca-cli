@@ -1,0 +1,47 @@
+name: release
+
+# Publica la release cuando se empuja un tag v*.
+#
+# workflow_dispatch existe para poder relanzar una publicación que falló sin
+# tener que borrar y recrear el tag: el release se construye desde el commit
+# donde esté el tag, que es lo único que goreleaser necesita.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    name: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # goreleaser necesita el historial para el changelog y el commit date.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: true
+
+      # .goreleaser.yaml corre `go mod tidy` y `scripts/check.sh` en `before.hooks`,
+      # así que no se repiten aquí: un solo lugar donde mirar.
+      - name: Publish the release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Todavía no existen el tap ni el bucket: skip_upload: auto en
+          # .goreleaser.yaml hace que su ausencia no tumbe la publicación.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
