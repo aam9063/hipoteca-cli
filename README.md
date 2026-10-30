@@ -25,10 +25,38 @@ El árbol completo de comandos y banderas, y el contrato exacto de cada salida J
 en la [referencia de la CLI](docs/cli-spec.md), que se genera desde el binario —así que no
 puede desfasar de él— y en el propio binario con `hipoteca schema` y `hipoteca skills list`.
 
-## Arranque rápido
+## Instalación
 
-No hay paquetes ni taps todavía: se compila desde el código fuente. Necesitas Go 1.26 o
-superior y `bash` (en Windows, el de Git Bash sirve para `make`).
+A partir de `v0.1.0` hay tres vías. **Mientras no haya un release publicado, sólo funciona
+la tercera** (compilar desde el código fuente): las otras dos descargan binarios de las
+releases de GitHub.
+
+**Linux y macOS, script de una línea.** Descarga el binario de tu plataforma, **verifica el
+checksum antes de escribir nada** y lo instala:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aam9063/hipoteca-cli/main/install.sh | sh
+```
+
+Variables útiles: `HIPOTECA_VERSION=v0.1.0` para fijar una versión y
+`HIPOTECA_INSTALL_DIR=~/.local/bin` para elegir el destino. El script rechaza cualquier
+checksum que no cuadre sin tocar la instalación anterior.
+
+**macOS y Linux, Homebrew:**
+
+```bash
+brew install aam9063/tap/hipoteca
+```
+
+**Windows, Scoop:**
+
+```powershell
+scoop bucket add aam9063 https://github.com/aam9063/scoop-bucket
+scoop install hipoteca
+```
+
+**Desde el código fuente**, que es la única que no depende de un release. Necesitas Go 1.26 o
+superior y `bash` (en Windows, el de Git Bash sirve para `make`):
 
 ```bash
 git clone https://github.com/aam9063/hipoteca-cli.git
@@ -36,6 +64,10 @@ cd hipoteca-cli
 make build                      # en Windows sin make: go build -o bin/hipoteca.exe ./cmd/hipoteca
 ./bin/hipoteca calc --principal 150000 --rate 3.10 --months 300
 ```
+
+Una instalación posterior se actualiza con `hipoteca update` (o `hipoteca update --check`
+para sólo ver si hay versión nueva), que también verifica el checksum y **deja intacta la
+instalación anterior si algo falla**.
 
 El primer comando de cálculo no necesita red. Para consultar índices publicados sí conecta
 con el Banco de España, que es la única conexión que hace:

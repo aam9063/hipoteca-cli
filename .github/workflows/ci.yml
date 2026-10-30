@@ -48,3 +48,42 @@ jobs:
         run: bash scripts/check-review-report.sh
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+
+  release-check:
+    name: release file and installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # goreleaser no está instalado en la máquina de desarrollo, así que un
+      # .goreleaser.yaml roto se descubriría el día del tag, que es el peor día.
+      - name: Validate .goreleaser.yaml
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: check
+
+      - name: install.sh syntax
+        run: sh -n install.sh
+
+      # Ejercita la detección de plataforma y la URL sin tocar la red.
+      - name: install.sh --dry-run
+        run: |
+          set -eu
+          fake=$(mktemp -d)
+          printf '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n' > "$fake/uname"
+          chmod +x "$fake/uname"
+          out=$(PATH="$fake:$PATH" HIPOTECA_VERSION=v0.1.0 sh install.sh --dry-run)
+          echo "$out"
+          echo "$out" | grep -q 'releases/download/v0.1.0/hipoteca_0.1.0_linux_amd64.tar.gz'
+
+      - name: install.sh rejects an unsupported system
+        run: |
+          set -eu
+          fake=$(mktemp -d)
+          printf '#!/bin/sh\ncase "$1" in -s) echo Plan9 ;; -m) echo x86_64 ;; esac\n' > "$fake/uname"
+          chmod +x "$fake/uname"
+          if PATH="$fake:$PATH" sh install.sh --dry-run >/dev/null 2>/tmp/err; then
+            echo "un sistema no soportado no debe instalar nada"; exit 1
+          fi
+          grep -q Scoop /tmp/err

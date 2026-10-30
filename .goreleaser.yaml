@@ -54,4 +54,34 @@ changelog:
       - '^test:'
       - '^chore:'
 
-# Homebrew tap and Scoop bucket are wired in REL-01, once the repositories exist.
+# El tap y el bucket tienen que existir antes del primer release con token:
+#   https://github.com/aam9063/homebrew-tap
+#   https://github.com/aam9063/scoop-bucket
+# skip_upload: auto hace que el release NO falle mientras no existan o falte
+# el token: publica los binarios y checksums, y se salta sólo esa parte.
+brews:
+  - name: hipoteca
+    repository:
+      owner: aam9063
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/aam9063/hipoteca-cli
+    description: Euríbor, IRPH y cálculos de hipoteca desde la CLI, en JSON
+    license: MIT
+    skip_upload: auto
+    install: |
+      bin.install "hipoteca"
+    test: |
+      system "#{bin}/hipoteca", "version"
+
+scoops:
+  - name: hipoteca
+    repository:
+      owner: aam9063
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    homepage: https://github.com/aam9063/hipoteca-cli
+    description: Euríbor, IRPH y cálculos de hipoteca desde la CLI, en JSON
+    license: MIT
+    skip_upload: auto
