@@ -75,19 +75,19 @@ func Load(path string) (Config, error) {
 		}
 		return Config{}, errs.New(errs.KindInternal,
 			fmt.Sprintf("no se pudo leer la configuración %s: %v", path, err),
-			"comprueba los permisos del archivo")
+			"comprueba los permisos del fichero")
 	}
 	var cfg Config
 	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return Config{}, errs.New(errs.KindInternal,
 			fmt.Sprintf("la configuración %s no es un TOML válido: %v", path, err),
-			"corrige o elimina el archivo a mano; no se sobrescribe automáticamente")
+			"corrige o elimina el fichero a mano; no se sobrescribe automáticamente")
 	}
 	if cfg.SchemaVersion != SchemaVersion {
 		return Config{}, errs.New(errs.KindInternal,
 			fmt.Sprintf("la configuración %s declara schema_version %d; esta versión del programa soporta la %d",
 				path, cfg.SchemaVersion, SchemaVersion),
-			"actualiza el programa o revisa el archivo a mano; no se sobrescribe automáticamente")
+			"actualiza el programa o revisa el fichero a mano; no se sobrescribe automáticamente")
 	}
 	if cfg.Indices == nil {
 		cfg.Indices = map[string]string{}

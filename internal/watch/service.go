@@ -22,8 +22,8 @@ var ErrServiceNoWatches = errors.New("watch: no hay ninguna vigilancia que el se
 type ServiceUnit struct {
 	Manager string // "systemd" o "launchd"
 	Name    string // nombre lógico que entiende el gestor
-	Path    string // ruta absoluta del archivo de la unidad
-	Content string // contenido exacto del archivo
+	Path    string // ruta absoluta del fichero de la unidad
+	Content string // contenido exacto del fichero
 }
 
 // ServiceIntervalText da el intervalo en la forma más corta que el gestor

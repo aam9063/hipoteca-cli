@@ -123,7 +123,7 @@ func TestCacheCorruptoSeIgnora(t *testing.T) {
 	c.cache = cache
 	key := "D_1NBAF472"
 
-	// Un archivo que no es JSON.
+	// Un fichero que no es JSON.
 	if err := os.WriteFile(cache.path("latest", key), []byte("no soy json"), 0o600); err != nil {
 		t.Fatalf("escribir caché corrupta: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestCacheEscribeEntradaVersionada(t *testing.T) {
 // escritura nunca rompe la petición (decisión 4).
 func TestCacheDirectorioNoEscribible(t *testing.T) {
 	ts, c := newFixtureClient(t, cuerpoFavoritasUno(), 0)
-	bloqueo := filepath.Join(t.TempDir(), "archivo")
+	bloqueo := filepath.Join(t.TempDir(), "fichero")
 	if err := os.WriteFile(bloqueo, []byte("x"), 0o600); err != nil {
 		t.Fatalf("preparar el bloqueo: %v", err)
 	}

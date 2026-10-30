@@ -46,7 +46,7 @@ func TestInstallScriptDryRun(t *testing.T) {
 	}
 
 	got := string(out)
-	// El nombre del archivo no lleva la "v" del tag: así lo publica goreleaser.
+	// El nombre del fichero no lleva la "v" del tag: así lo publica goreleaser.
 	wantURL := "https://github.com/aam9063/hipoteca-cli/releases/download/v0.1.0/hipoteca_0.1.0_linux_amd64.tar.gz"
 	if !strings.Contains(got, wantURL) {
 		t.Fatalf("la URL no es la esperada\nquiero: %s\nsalida:\n%s", wantURL, got)
