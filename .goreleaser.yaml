@@ -2,6 +2,10 @@
 # Validate with: goreleaser check
 version: 2
 
+# Explícito a propósito: install.sh y su test derivan de aquí el nombre de los
+# archivos de la release. Si goreleaser lo cambia por defecto, esto no se mueve.
+project_name: hipoteca-cli
+
 before:
   hooks:
     - go mod tidy
