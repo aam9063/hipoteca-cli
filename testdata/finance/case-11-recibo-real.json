@@ -1,0 +1,41 @@
+{
+  "id": "case-11-recibo-real",
+  "description": "Contraste contra un recibo de hipoteca real, no contra un generador. Un banco liquidó 2021-06 con TIN 0.503 % (Euríbor de marzo, diferencial +0.99), interés 45.89 y amortización 224.95 sobre un capital de 109479.58. Lo que este caso prueba es que nuestras convenciones producen los mismos números que el banco: el tipo desde índice y diferencial, y el interés del mes redondeado a céntimos. Las identidades de cuota y capital son aritmética del propio recibo. El recibo no dice el capital inicial, el plazo original ni la fecha de inicio, así que este caso no es un cuadro completo: es la cadena tipo -> interés de un mes.",
+  "inputs": {
+    "principal": "109479.58",
+    "tin": "0.503",
+    "index_value": "-0.487",
+    "index_reference_month": "2021-03",
+    "index_series": "D_1NBAF472",
+    "spread": "0.990",
+    "rate_rounding": "none",
+    "floor_rate": null,
+    "revision_date": "2021-05-01",
+    "reference_offset_months": 2,
+    "settlement_period": "2021-06-01/2021-06-30",
+    "revision_every_months": 6,
+    "interest_convention": "monthly-nominal",
+    "payment_rounding": "half-up-cents"
+  },
+  "expected": {
+    "tin_after_rounding": "0.503",
+    "interest": "45.89",
+    "principal_repaid": "224.95",
+    "payment": "270.84",
+    "outstanding_before": "109479.58",
+    "outstanding_after": "109254.63"
+  },
+  "source": {
+    "kind": "bank-receipt",
+    "note": "Recibo de una hipoteca mixta a tipo variable, período de liquidación 2021-06-01 a 2021-06-30, anonimizado: no se conserva el titular, el código de cliente ni la cuenta de cargo. Los valores esperados están transcritos del recibo, no calculados.",
+    "fields_the_receipt_does_not_state": [
+      "capital inicial",
+      "plazo original en meses",
+      "fecha de inicio del préstamo",
+      "cuota anterior a la revisión"
+    ],
+    "why_the_reference_month_is_march": "La revisión fue el 2021-05-01 y el índice aplicado es el de marzo: en esa fecha el BOE todavía no había publicado abril. Eso es reference_offset_months = 2, según docs/calculos.md («Qué es el mes de referencia»).",
+    "verified_against": "testdata/bde/listaSeries-euribor-1y-MAX.json, serie D_1NBAF472, mes 2021-03 = -0.487",
+    "recorded_at": "2026-10-30"
+  }
+}

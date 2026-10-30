@@ -98,6 +98,24 @@ En cada revisión:
 4. La cuota se **recalcula** con el capital pendiente y los meses restantes, aplicando las
    convenciones 1.2–1.4.
 
+#### Qué es el «mes de referencia»
+
+El índice que se aplica en una revisión **no es el del mes en que se revisa**: es el último
+que estaba publicado en el BOE en la fecha de revisión, y las escrituras suelen fijarlo
+explícitamente (por ejemplo «Euríbor del mes anterior» o «del segundo mes anterior»).
+
+Ese desfase es el dato `reference_offset_months` del préstamo, y el mes de referencia es
+`mes de revisión − reference_offset_months`. Como el BOE publica el índice de un mes ya
+avanzado el mes siguiente, en la práctica el valor suele ser **1 o 2** según lo que diga la
+escritura. **El CLI nunca lo deduce:** si falta, la respuesta es `loan_incomplete` nombrando
+el campo (P-06). Suponerlo daría un tipo y una cuota que no son los del contrato.
+
+Ejemplo con un recibo real (caso 11 de `testdata/finance/`): revisión el `2021-05-01`, índice
+publicado aplicado el de **marzo de 2021** (`−0.487`), diferencial `+0.99` → `TIN 0.503 %`,
+e interés del mes sobre `109479.58` → `45.89`. El mes de abril habría dado `0.506 %` y
+`46.16`: tres milésimas y veintisiete céntimos de diferencia, que es exactamente lo que la
+escritura decide y el programa no puede adivinar.
+
 La amortización anticipada usa la misma maquinaria: comisión
 `= importe · early_repayment_fee_pct / 100`; en `reduce-payment` se recalcula la cuota con
 el mismo plazo restante; en `reduce-term` se mantiene la cuota y el plazo es el número de
