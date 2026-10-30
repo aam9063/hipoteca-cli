@@ -22,8 +22,8 @@ $ hipoteca index show euribor-1y --range 60M
 ```
 
 > **Status:** `v0.1.0` is released. The calculation commands, the agent commands and the
-> notification commands are complete and tested on Linux, macOS and Windows. Homebrew and
-> Scoop packaging are not published yet; install with the script or from source.
+> notification commands are complete and tested on Linux, macOS and Windows, and packaged
+> for Homebrew and Scoop.
 
 ## Why it exists
 
@@ -66,8 +66,20 @@ make build                       # Windows without make: go build -o bin\hipotec
 Upgrades are handled by `hipoteca update` (or `update --check` to only look), which also
 verifies the checksum and **leaves the previous installation intact if anything fails**.
 
-Homebrew and Scoop are not registered yet. Until they are, use the script or build from
-source.
+**macOS and Linux, Homebrew.** A Cask, because goreleaser v2 no longer generates formulae
+for binaries:
+
+```bash
+brew tap aam9063/tap
+brew install --cask hipoteca
+```
+
+**Windows, Scoop:**
+
+```powershell
+scoop bucket add aam9063 https://github.com/aam9063/scoop-bucket
+scoop install hipoteca
+```
 
 ## Using it
 
