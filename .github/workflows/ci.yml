@@ -75,7 +75,7 @@ jobs:
           chmod +x "$fake/uname"
           out=$(PATH="$fake:$PATH" HIPOTECA_VERSION=v0.1.0 sh install.sh --dry-run)
           echo "$out"
-          echo "$out" | grep -q 'releases/download/v0.1.0/hipoteca_0.1.0_linux_amd64.tar.gz'
+          echo "$out" | grep -q 'releases/download/v0.1.0/hipoteca-cli_0.1.0_linux_amd64.tar.gz'
 
       - name: install.sh rejects an unsupported system
         run: |

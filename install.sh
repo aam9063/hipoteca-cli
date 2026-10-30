@@ -15,6 +15,9 @@
 set -eu
 
 REPO="aam9063/hipoteca-cli"
+# goreleaser nombra los archivos con el nombre del PROYECTO (.ProjectName),
+# y el binario de dentro con el del build: son distintos.
+PROJECT="hipoteca-cli"
 BIN="hipoteca"
 DRY_RUN=0
 
@@ -91,7 +94,7 @@ fi
 # goreleaser nombra los archivos sin la "v" del tag.
 NUM_VERSION=$(printf '%s' "$VERSION" | sed 's/^v//')
 EXT="tar.gz"
-ASSET="${BIN}_${NUM_VERSION}_${OS}_${ARCH}.${EXT}"
+ASSET="${PROJECT}_${NUM_VERSION}_${OS}_${ARCH}.${EXT}"
 BASE="https://github.com/$REPO/releases/download/${VERSION:-latest}"
 URL="$BASE/$ASSET"
 
