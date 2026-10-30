@@ -105,7 +105,7 @@ func WatchAdd(dbPath, cfgPath string, catalog *bde.Catalog, kind, target, sink s
 	if s.Type != "webhook" {
 		return WatchView{}, errs.New(errs.KindUsage,
 			fmt.Sprintf("el sink %q es de tipo %q; en esta versión sólo hay \"webhook\"", sink, s.Type),
-			"cambia el type del sink en la configuración")
+			fmt.Sprintf("declara su tipo con \"hipoteca config set sinks.%s.type webhook\"", sink))
 	}
 	db, err := openWatchDB(dbPath)
 	if err != nil {
@@ -201,7 +201,7 @@ func sinkResolver(cfg config.Config) func(string) (watch.Sink, error) {
 		if s.Type != "webhook" {
 			return nil, errs.New(errs.KindUsage,
 				fmt.Sprintf("el sink %q es de tipo %q; en esta versión sólo hay \"webhook\"", name, s.Type),
-				"cambia el type del sink en la configuración")
+				fmt.Sprintf("declara su tipo con \"hipoteca config set sinks.%s.type webhook\"", name))
 		}
 		if s.URL == "" {
 			return nil, errs.New(errs.KindUsage,

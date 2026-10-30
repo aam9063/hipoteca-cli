@@ -35,7 +35,11 @@ type Deps struct {
 	Runtime    func() (*app.Runtime, error)
 	ConfigPath func() (string, error)
 	DataPath   func() (string, error)
-	Version    string
+	// CacheDir es la ruta del directorio de la caché de series
+	// (config.CacheDir); doctor la reporta (AGENT-01) y los tests la
+	// inyectan temporal, igual que ConfigPath y DataPath.
+	CacheDir func() (string, error)
+	Version  string
 }
 
 // newRuntime es la construcción de producción del runtime; es una variable
@@ -119,7 +123,10 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		},
 	}
 
-	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps), newWatchCmd(deps))
+	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps), newWatchCmd(deps),
+		// AGENT-01: la guía para agentes, el contrato de salida, el
+		// diagnóstico y la configuración.
+		newSkillsCmd(), newSchemaCmd(), newDoctorCmd(info, deps), newConfigCmd(deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.
