@@ -47,7 +47,13 @@ func TestInstallScriptDryRun(t *testing.T) {
 
 	got := string(out)
 	// El nombre del fichero no lleva la "v" del tag: así lo publica goreleaser.
-	wantURL := "https://github.com/aam9063/hipoteca-cli/releases/download/v0.1.0/hipoteca_0.1.0_linux_amd64.tar.gz"
+	// El nombre del archivo sale de .goreleaser.yaml, no de aquí: escribirlo a
+	// mano fue exactamente lo que dejó pasar el defecto que rompió install.sh
+	// en su primera descarga real (el asset se llama como el proyecto, no como
+	// el binario).
+	project := projectNameFromGoreleaser(t)
+	wantURL := "https://github.com/aam9063/hipoteca-cli/releases/download/v0.1.0/" +
+		project + "_0.1.0_linux_amd64.tar.gz"
 	if !strings.Contains(got, wantURL) {
 		t.Fatalf("la URL no es la esperada\nquiero: %s\nsalida:\n%s", wantURL, got)
 	}
@@ -103,4 +109,25 @@ func ok(err error, target **exec.ExitError) bool {
 		*target = e
 	}
 	return is
+}
+
+// projectNameFromGoreleaser lee project_name de .goreleaser.yaml. Si falta, el
+// test falla: el nombre de los assets no puede ser una suposición.
+func projectNameFromGoreleaser(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("resolviendo la raíz: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
+	if err != nil {
+		t.Fatalf("leyendo .goreleaser.yaml: %v", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "project_name:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "project_name:"))
+		}
+	}
+	t.Fatal(".goreleaser.yaml no declara project_name: install.sh y este test dependen de él")
+	return ""
 }
