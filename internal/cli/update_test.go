@@ -215,7 +215,7 @@ func TestUpdateAppliesFromLocalServer(t *testing.T) {
 // sale con el tipo del contrato (upstream_unavailable, código 5), con stdout
 // vacío.
 func TestUpdateChecksumMismatchLeavesPreviousBinaryIntact(t *testing.T) {
-	// El servidor declara un checksum que no corresponde con el archivo que
+	// El servidor declara un checksum que no corresponde con el fichero que
 	// sirve: la descarga "está corrupta".
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -305,7 +305,7 @@ func TestUpdateIsInTheCommandTree(t *testing.T) {
 // buildFakeZip monta un zip mínimo con "hipoteca" dentro, que es lo que
 // goreleaser publica para Windows. Sin esto el test del camino feliz pasaría
 // en Linux y macOS y fallaría en Windows, que es exactamente el defecto que
-// este archivo ya tuvo.
+// este fichero ya tuvo.
 func buildFakeZip(t *testing.T, content []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer

@@ -113,9 +113,9 @@ func buildZip(t *testing.T, entries map[string][]byte) []byte {
 }
 
 // releaseFiles monta los ficheros de una release con el tag dado: el binario
-// va dentro del archivo y checksums.txt lista el sha256 de lo que hay en el
+// va dentro del fichero y checksums.txt lista el sha256 de lo que hay en el
 // servidor. checksumOverride permite servir un checksum que NO corresponde al
-// archivo servido (caso "descarga corrupta", L3).
+// fichero servido (caso "descarga corrupta", L3).
 func releaseFiles(t *testing.T, tag, version string, binary []byte, goos, goarch string, checksumOverride map[string]string) map[string][]byte {
 	t.Helper()
 	var archive []byte
@@ -420,7 +420,7 @@ func TestApplyNetworkFailureLeavesPreviousBinaryIntact(t *testing.T) {
 	}
 }
 
-// L3: el binario corrupto (el archivo de la release no es un archivo válido)
+// L3: el binario corrupto (el fichero de la release no es un fichero válido)
 // deja la instalación anterior intacta.
 func TestApplyCorruptArchiveLeavesPreviousBinaryIntact(t *testing.T) {
 	archive := []byte("esto no es un tar.gz, son bytes corruptos")
@@ -443,7 +443,7 @@ func TestApplyCorruptArchiveLeavesPreviousBinaryIntact(t *testing.T) {
 	}
 }
 
-// L3: el checksum verifica pero el binario dentro del archivo está corrupto
+// L3: el checksum verifica pero el binario dentro del fichero está corrupto
 // (bytes sueltos): la instalación anterior debe sobrevivir igualmente.
 func TestApplyCorruptBinaryInsideArchiveLeavesPreviousBinaryIntact(t *testing.T) {
 	bin := []byte("bytes que no son un ejecutable")
@@ -452,7 +452,7 @@ func TestApplyCorruptBinaryInsideArchiveLeavesPreviousBinaryIntact(t *testing.T)
 	up, dest := testUpdater(t, srv, "0.1.0")
 	writeFile(t, dest, []byte("binario-viejo"), 0o755)
 
-	// El checksum cuadra (es lo que hay en el archivo), así que el reemplazo
+	// El checksum cuadra (es lo que hay en el fichero), así que el reemplazo
 	// se hace: este caso prueba que el fallo NO deja a medias. Un binario que
 	// no ejecuta es un problema del release, no de la instalación; lo que
 	// aquí se fija es que el reemplazo es completo (nada a medias en el dir).
@@ -472,8 +472,8 @@ func TestApplyCorruptBinaryInsideArchiveLeavesPreviousBinaryIntact(t *testing.T)
 }
 
 func TestApplyMissingAssetLeavesPreviousBinaryIntact(t *testing.T) {
-	// El checksums.txt existe pero el archivo de la plataforma no está en el
-	// servidor: 404 en la descarga del archivo.
+	// El checksums.txt existe pero el fichero de la plataforma no está en el
+	// servidor: 404 en la descarga del fichero.
 	files := map[string][]byte{
 		"/api/latest":                    []byte(`{"tag_name":"v0.2.0","html_url":"u"}`),
 		"/download/v0.2.0/checksums.txt": []byte(sha256hex([]byte("x")) + "  hipoteca_0.2.0_linux_amd64.tar.gz\n"),
@@ -493,7 +493,7 @@ func TestApplyChecksumsMissingEntryLeavesBinaryIntact(t *testing.T) {
 	srv := fakeServerFor(t, nil, 0, releaseFiles(t, "v0.2.0", "0.2.0", []byte("binario-nuevo"), "linux", "amd64", nil))
 	up, dest := testUpdater(t, srv, "0.1.0")
 	// Apuntamos a una plataforma de la que checksums.txt no sabe nada: el
-	// archivo existe en el servidor, pero el checksums.txt no lo lista.
+	// fichero existe en el servidor, pero el checksums.txt no lo lista.
 	up.Arch = "arm64"
 	extra := buildTarGz(t, map[string][]byte{"hipoteca": []byte("binario-nuevo-arm64")})
 	srv.files["/download/v0.2.0/hipoteca_0.2.0_linux_arm64.tar.gz"] = extra
@@ -553,11 +553,11 @@ func TestSwapReplacesExistingFile(t *testing.T) {
 }
 
 // TestExtractRejectsArchiveWithoutBinary fija el caso "el release cambió de
-// forma": un archivo sin el binario esperado es un api_changed, no un pánico.
+// forma": un fichero sin el binario esperado es un api_changed, no un pánico.
 func TestExtractRejectsArchiveWithoutBinary(t *testing.T) {
 	archive := buildTarGz(t, map[string][]byte{"LICENSE": []byte("MIT")})
 	if _, err := extractBinary(archive, "linux"); err == nil {
-		t.Fatal("un archivo sin hipoteca debe fallar")
+		t.Fatal("un fichero sin hipoteca debe fallar")
 	} else if env, ok := errs.From(err); !ok || env.Error.Type != string(errs.KindAPIChanged) {
 		t.Errorf("kind = %+v, want api_changed", env)
 	}

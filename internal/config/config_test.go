@@ -204,7 +204,7 @@ func equalLoans(t *testing.T, want, got loan.Loan) {
 
 // TestLoadParsesLoansSection: un TOML escrito a mano con la forma del
 // arranque (§4.1, [loans.<id>] con sync anidado) se lee en cfg.Loans. Fija el
-// formato del archivo: claves snake_case, floor_rate vacío = sin suelo y
+// formato del fichero: claves snake_case, floor_rate vacío = sin suelo y
 // sync como tabla anidada.
 func TestLoadParsesLoansSection(t *testing.T) {
 	tomlText := `schema_version = 1

@@ -27,7 +27,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp")
 	if err != nil {
-		return fmt.Errorf("no se pudo crear el archivo temporal en %s: %w", dir, err)
+		return fmt.Errorf("no se pudo crear el fichero temporal en %s: %w", dir, err)
 	}
 	tmpName := tmp.Name()
 	// Every exit below removes the temp file; only a successful Rename leaves

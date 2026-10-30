@@ -64,7 +64,7 @@ func ServiceInstall(unit ServiceUnit, run ServiceRunner) (ServiceState, error) {
 }
 
 // ServiceUninstall retira todo lo que puso ServiceInstall. Sin restos: en
-// systemd eso incluye el estado de "enabled", que vive fuera del archivo de la
+// systemd eso incluye el estado de "enabled", que vive fuera del fichero de la
 // unidad y sobreviviría a borrarlo; en launchd, el agente tiene que estar
 // descargado antes de que su plist desaparezca. Desinstalar dos veces no falla.
 func ServiceUninstall(unit ServiceUnit, run ServiceRunner) (ServiceState, error) {
@@ -113,7 +113,7 @@ func ServiceStatusOf(unit ServiceUnit) (ServiceState, error) {
 	}
 	state := ServiceState{
 		Installed: installed,
-		Active:    installed, // el archivo es la prueba de que el gestor la conoce
+		Active:    installed, // el fichero es la prueba de que el gestor la conoce
 		Manager:   unit.Manager,
 		Path:      unit.Path,
 		Name:      unit.Name,
