@@ -57,8 +57,9 @@ changelog:
 # El tap y el bucket tienen que existir antes del primer release con token:
 #   https://github.com/aam9063/homebrew-tap
 #   https://github.com/aam9063/scoop-bucket
-# skip_upload: auto hace que el release NO falle mientras no existan o falte
-# el token: publica los binarios y checksums, y se salta sólo esa parte.
+# skip_upload: true mientras el tap y el bucket no existan: el release publica
+# binarios y checksums y no falla al final por no poder subir la fórmula. Cuando
+# los repositorios existan y tengan token, se pone en false y se prueba.
 #
 # goreleaser v2.19 marca `brews` como deprecado: la vía vigente para distribuir
 # un binario es un Cask, no una Formula.
@@ -73,7 +74,7 @@ homebrew_casks:
     description: Euríbor, IRPH y cálculos de hipoteca desde la CLI, en JSON
     license: MIT
     binaries: [hipoteca]
-    skip_upload: auto
+    skip_upload: true
 
 scoops:
   - name: hipoteca
@@ -84,4 +85,4 @@ scoops:
     homepage: https://github.com/aam9063/hipoteca-cli
     description: Euríbor, IRPH y cálculos de hipoteca desde la CLI, en JSON
     license: MIT
-    skip_upload: auto
+    skip_upload: true
