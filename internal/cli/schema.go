@@ -86,6 +86,9 @@ var schemaTable = []schemaEntry{
 	{"config show", "La configuración completa, con los sinks redactados", app.ConfigShowResult{}},
 	{"config get", "El valor de una clave de la config", app.ConfigValueResult{}},
 	{"config set", "La clave escrita en la config", app.ConfigValueResult{}},
+	// REL-01: la salida de `hipoteca update` y `hipoteca update --check` es la
+	// misma forma (updated false e installed_path vacío en --check).
+	{"update", "El estado de la actualización y su resultado", updateOutput{}},
 }
 
 // newSchemaCmd: `hipoteca schema [comando]`.

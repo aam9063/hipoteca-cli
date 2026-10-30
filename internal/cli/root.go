@@ -39,7 +39,17 @@ type Deps struct {
 	// (config.CacheDir); doctor la reporta (AGENT-01) y los tests la
 	// inyectan temporal, igual que ConfigPath y DataPath.
 	CacheDir func() (string, error)
-	Version  string
+	// UpdateAPIURL, UpdateBaseURL y UpdateDestPath sustituyen los valores de
+	// producción de `hipoteca update` (REL-01): los tests los apuntan a un
+	// servidor httptest local y a un binario temporal, y así ninguna prueba
+	// toca la red ni el binario real del host (S8). UpdateOS y UpdateArch
+	// fijan la plataforma de la release a descargar; vacíos usan el host.
+	UpdateAPIURL   string
+	UpdateBaseURL  string
+	UpdateDestPath string
+	UpdateOS       string
+	UpdateArch     string
+	Version        string
 }
 
 // newRuntime es la construcción de producción del runtime; es una variable
@@ -126,7 +136,9 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 	root.AddCommand(newVersionCmd(info), newIndexCmd(deps), newCalcCmd(), newAmortizeCmd(deps), newScenarioCmd(deps), newLoanCmd(deps), newRevisionCmd(deps), newScheduleCmd(deps), newCompareCmd(deps), newWatchCmd(deps),
 		// AGENT-01: la guía para agentes, el contrato de salida, el
 		// diagnóstico y la configuración.
-		newSkillsCmd(), newSchemaCmd(), newDoctorCmd(info, deps), newConfigCmd(deps))
+		newSkillsCmd(), newSchemaCmd(), newDoctorCmd(info, deps), newConfigCmd(deps),
+		// REL-01: la actualización del propio binario.
+		newUpdateCmd(info, deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.

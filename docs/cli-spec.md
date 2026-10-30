@@ -430,6 +430,30 @@ Las recetas disponibles, con su id y una línea de para qué sirven
 
 Uso: `hipoteca skills list`
 
+### `hipoteca update`
+
+**Estado:** v0.1.0 (disponible).
+
+Comprueba la última release publicada y, si quieres, actualiza este binario
+
+Comprueba en GitHub la última release publicada de hipoteca-cli y responde
+con la versión de este binario, la disponible y si hay una más nueva.
+
+Sin --check, además descarga la release, verifica su checksum contra el
+checksums.txt publicado y reemplaza este binario con escritura atómica: si la
+red falla, el checksum no cuadra o la descarga está corrupta, la instalación
+anterior queda intacta y funcionando — nada se escribe hasta que el checksum
+cuadra.
+
+update es la única orden de la CLI que sustituye el binario en ejecución. No
+toca tu config, tus préstamos ni ningún dato: sólo el binario.
+
+Uso: `hipoteca update [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--check` | `bool` | `false` | sólo comprobar: no descarga ni escribe nada, responde en JSON |
+
 ### `hipoteca version`
 
 **Estado:** v0.1.0 (disponible).
@@ -1057,4 +1081,19 @@ La clave escrita en la config
 | `schema_version` | `integer` |  |
 | `key` | `string` |  |
 | `value` | `string` |  |
+
+### `update`
+
+El estado de la actualización y su resultado
+
+| Campo | Tipo | Opcional |
+|---|---|---|
+| `schema_version` | `integer` |  |
+| `current_version` | `string` |  |
+| `latest_version` | `string` |  |
+| `update_available` | `boolean` |  |
+| `release_url` | `string` | sí |
+| `updated` | `boolean` |  |
+| `installed_version` | `string` | sí |
+| `installed_path` | `string` | sí |
 
