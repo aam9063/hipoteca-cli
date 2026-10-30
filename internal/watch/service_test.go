@@ -118,8 +118,8 @@ func TestServiceInstallEsIdempotente(t *testing.T) {
 }
 
 // TestServiceUninstallNoDejaRestos es el criterio de aceptación de la tarea:
-// fuera el archivo, fuera el directorio, y el estado de systemd desactivado
-// (que vive fuera del archivo y sobreviviría a borrarlo).
+// fuera el fichero, fuera el directorio, y el estado de systemd desactivado
+// (que vive fuera del fichero y sobreviviría a borrarlo).
 func TestServiceUninstallNoDejaRestos(t *testing.T) {
 	unit := hostUnit(t)
 	var calls []string
@@ -165,7 +165,7 @@ func TestServiceUninstallDosVecesNoFalla(t *testing.T) {
 	}
 }
 
-func TestServiceStatusReflejaElArchivo(t *testing.T) {
+func TestServiceStatusReflejaElFichero(t *testing.T) {
 	unit := hostUnit(t)
 	before, err := ServiceStatusOf(unit)
 	if err != nil {
@@ -187,9 +187,9 @@ func TestServiceStatusReflejaElArchivo(t *testing.T) {
 	}
 }
 
-// hostUnit arma una unidad sobre el sistema de archivos real del test. Los
+// hostUnit arma una unidad sobre el sistema de ficheros real del test. Los
 // tests de generación usan ServiceUnitFor con el SO destino; los de escritura
-// no, para no mezclar "qué contenido toca" con "dónde vive este archivo aquí".
+// no, para no mezclar "qué contenido toca" con "dónde vive este fichero aquí".
 func hostUnit(t *testing.T) ServiceUnit {
 	t.Helper()
 	return ServiceUnit{

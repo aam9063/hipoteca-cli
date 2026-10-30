@@ -188,7 +188,7 @@ func (u *Updater) shouldUpdate(latest string) bool {
 	return cmp < 0
 }
 
-// archiveName reconstruye el nombre del archivo de la plataforma con el
+// archiveName reconstruye el nombre del fichero de la plataforma con el
 // patrón de .goreleaser.yaml: hipoteca_<versión>_<os>_<arch>.<ext>.
 func (u *Updater) archiveName(version string) string {
 	ext := "tar.gz"
@@ -354,7 +354,7 @@ func parseChecksums(data []byte) map[string]string {
 	return out
 }
 
-// extractBinary saca el binario del archivo del release: tar.gz en Unix y
+// extractBinary saca el binario del fichero del release: tar.gz en Unix y
 // zip en Windows, con la entrada que goreleaser publica ("hipoteca" o
 // "hipoteca.exe" en la raíz). Un release que no la trae es un cambio del
 // upstream (api_changed), no un panic.
@@ -367,7 +367,7 @@ func extractBinary(archive []byte, goos string) ([]byte, error) {
 		zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 		if err != nil {
 			return nil, errs.New(errs.KindUpstreamUnavailable,
-				"el archivo de la release no es un zip válido: está corrupto y no se ha instalado nada",
+				"el fichero de la release no es un zip válido: está corrupto y no se ha instalado nada",
 				"reintenta más tarde; si vuelve a fallar, el release está mal publicado")
 		}
 		for _, f := range zr.File {
@@ -395,7 +395,7 @@ func extractBinary(archive []byte, goos string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		return nil, errs.New(errs.KindUpstreamUnavailable,
-			"el archivo de la release no es un tar.gz válido: está corrupto y no se ha instalado nada",
+			"el fichero de la release no es un tar.gz válido: está corrupto y no se ha instalado nada",
 			"reintenta más tarde; si vuelve a fallar, el release está mal publicado")
 	}
 	defer gz.Close()
