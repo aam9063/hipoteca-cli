@@ -14,6 +14,14 @@ casos fijan están en `docs/calculos.md`; léelo antes de tocar nada de aquí.
   marca (`index_values_status: "published"`, con mes, valor y serie por entrada).
 - `case-09` y `case-10`: amortización anticipada en los dos modos
   (`reduce-payment` y `reduce-term`), comisión 0 %.
+- `case-11`: contraste contra un **recibo bancario real** de una hipoteca mixta
+  (período 2021-06, anonimizado). No lo genera `generate.py`: sus valores esperados están
+transcritos del papel, y lo que prueba es que nuestras convenciones producen los mismos
+números que el banco (TIN desde índice y diferencial, e interés del mes redondeado a
+céntimos). El recibo no declara capital inicial ni plazo original, así que el caso cubre la
+cadena tipo → interés de un mes, no un cuadro completo. Es también el ejemplo que fija la
+convención del mes de referencia: revisión el 2021-05-01 con el índice de **marzo**, porque
+el BOE aún no había publicado abril.
 
 La procedencia del índice de los casos 6 a 8 se comprueba contra
 `testdata/bde/listaSeries-euribor-1y-MAX.json`: el generador verifica cada mes y cada
