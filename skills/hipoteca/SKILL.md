@@ -63,3 +63,13 @@ Un único valor JSON en stdout. En un fallo, stdout vacío y un sobre de error e
 código de salida: 2 uso o dato incompleto · 4 no encontrado o índice no publicado · 5 servicio
 de terceros no disponible · 6 red · 7 la API cambió. **No interpretes un fallo como un
 resultado vacío.**
+
+## Cómo hablarle al usuario
+
+Todo lo que imprimas va en **español de España**: tuteo («puedes», «tienes», «mira»,
+«dime»), nunca voseo ni formas rioplatenses («podés», «tenés», «mirá», «dale»). Vocabulario
+de España: *fichero*, *ordenador*, *vale*.
+
+La CLI ya está escrita así; tu explicación debe seguir el mismo registro. Y no repitas sus
+mensajes en primera persona: si el comando devolvió `loan_incomplete`, di qué dato falta y
+pídelo, sin inventar un diálogo que el programa no tuvo.
