@@ -562,3 +562,21 @@ func TestExtractRejectsArchiveWithoutBinary(t *testing.T) {
 		t.Errorf("kind = %+v, want api_changed", env)
 	}
 }
+
+// El nombre del asset sale de project_name en .goreleaser.yaml, no de una
+// constante escrita a mano: escribirlo a mano fue lo que dejó pasar el 404 de
+// la primera actualización real.
+func TestArchiveNameUsesTheProjectName(t *testing.T) {
+	want := projectNameFromGoreleaser(t)
+	if projectName != want {
+		t.Fatalf("projectName = %q, .goreleaser.yaml dice %q", projectName, want)
+	}
+	u := &Updater{OS: "linux", Arch: "amd64"}
+	if got := u.archiveName("0.1.1"); got != want+"_0.1.1_linux_amd64.tar.gz" {
+		t.Fatalf("archiveName = %q, se esperaba %s_0.1.1_linux_amd64.tar.gz", got, want)
+	}
+	w := &Updater{OS: "windows", Arch: "arm64"}
+	if got := w.archiveName("0.1.1"); got != want+"_0.1.1_windows_arm64.zip" {
+		t.Fatalf("archiveName windows = %q", got)
+	}
+}
