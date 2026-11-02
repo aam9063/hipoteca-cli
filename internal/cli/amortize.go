@@ -54,7 +54,7 @@ posterior.`,
 					if err != nil {
 						return err
 					}
-					return writeResult(cmd, res)
+					return writeAmortize(cmd, res)
 				}
 				// ok == false: no hay préstamos guardados; cae al camino de
 				// flags con su error de banderas que faltan.
@@ -115,7 +115,7 @@ posterior.`,
 			if err != nil {
 				return err
 			}
-			return writeResult(cmd, res)
+			return writeAmortize(cmd, res)
 		},
 	}
 	cmd.Flags().String("principal", "", "capital del préstamo en euros, p. ej. 150000.00 (no se admite con un préstamo guardado)")
@@ -128,7 +128,18 @@ posterior.`,
 	// guardado no hay calendario.
 	cmd.Flags().Int("date", 0, "mes del evento: número de la cuota (1, 2, 3…) tras la que se amortiza, contado desde el inicio del cálculo; no es una fecha de calendario, p. ej. 60")
 	cmd.Flags().String("mode", "", "modo de la amortización: reduce-payment, reduce-term o compare (devuelve las dos opciones, sin recomendar)")
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: las dos opciones en columnas (en compare), con el modo y el ahorro en el resumen")
 	return cmd
+}
+
+// writeAmortize escribe el resultado de `amortize` (PRETTY-01, S4/S5): con
+// --pretty la tabla con su resumen; sin ella, el JSON de siempre (P-01).
+func writeAmortize(cmd *cobra.Command, res app.AmortizeResult) error {
+	if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+		_, err := fmt.Fprint(cmd.OutOrStdout(), renderAmortizeTable(res))
+		return err
+	}
+	return writeResult(cmd, res)
 }
 
 // amortizeDePrestamo construye las entradas de `amortize` desde un préstamo
