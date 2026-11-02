@@ -1,202 +1,175 @@
-# hipoteca-cli
-
 [![ci](https://github.com/aam9063/hipoteca-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/aam9063/hipoteca-cli/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/aam9063/hipoteca-cli)](https://github.com/aam9063/hipoteca-cli/releases)
 [![go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Spanish mortgage maths on the command line: **official Banco de España reference indices**
-(Euríbor, IRPH, €STR and eleven more), rate revisions, amortization schedules, early
-repayment and index comparison. Exact decimals, JSON output, and no financial advice —
-by design.
+# hipoteca-cli
 
-Built to be driven by an AI agent: every command carries its own recipe, and the output
-contract is generated from the binary.
+Spanish mortgage maths on the terminal: official Banco de España indices, rate revisions,
+amortization schedules, early repayment and index comparison. Exact decimals, JSON for
+agents, tables for people, and no financial advice — by design.
 
-```console
-$ hipoteca revision casa --date 2027-01
-$ hipoteca amortize casa --amount 10000 --mode compare
-$ hipoteca compare casa --index irph --spread 1.00
-$ hipoteca scenario casa --index-values 1.5,2,2.5,3
-$ hipoteca index show euribor-1y --range 60M
+```bash
+hipoteca revision casa --date 2022-06 --pretty
+```
+```
+  CONCEPTO              VALOR
+  Préstamo              casa
+  Fecha de revisión     2022-06-01
+  Índice                euribor-1y
+  Mes de referencia     2022-04
+  Valor del índice      0,013 %
+  TIN anterior          1,25 %
+  Diferencial           0,89 %
+  TIN nuevo             0,903 %
+  Capital pendiente     175023,35 €
+  Meses restantes       348
+  Cuota anterior        599,85 €
+  Cuota nueva           571,85 €
+  Diferencia al mes     -28,00 €
+  Diferencia al año     -336,00 €
+  Mes de referencia del índice: 2022-04
+  Elaboración propia con datos extraídos del sitio web del Banco de
+  España (www.bde.es) (datos actualizados: 2026-09-01)
 ```
 
-> **Status:** `v0.1.0` is released. The calculation commands, the agent commands and the
-> notification commands are complete and tested on Linux, macOS and Windows, and packaged
-> for Homebrew and Scoop.
+- **Rate revisions** with the index month your escritura specifies, not the month you ask about:
+  a revision on 2022-06 applies the 2022-04 Euríbor, because that was the last one published.
+- **Amortization schedules** to the cent, with the monthly interest rounded *before* amortizing.
+- **Early repayment**, both ways, compared side by side:
 
-## Why it exists
+```bash
+hipoteca amortize --principal 150000 --rate 3.10 --months 300 \
+  --amount 10000 --date 60 --mode compare --pretty
+```
+```
+  CONCEPTO                REDUCIR CUOTA            REDUCIR PLAZO
+  Importe amortizado      10000,00 €               10000,00 €
+  Comisión                0,00 €                   0,00 €
+  Cuota antes             719,14 €                 719,14 €
+  Cuota después           663,18 €                 719,14 €
+  Plazo después (meses)   300                      275
+  Intereses ahorrados     3431,18 €                8004,38 €
+  Meses ahorrados         0                        25
+  Modo: compare · Intereses ahorrados: 3431,18 € reduciendo cuota /
+  8004,38 € reduciendo plazo
+```
 
-Mortgage arithmetic looks simple and is not: the reference month is not the revision month,
-the floor applies before the escritura rounding, the monthly interest is rounded to cents
-*before* amortizing, and a negative rate shortens the loan instead of stopping it. Getting
-one of those wrong costs cents per month and never announces itself.
+- **Index comparison** with real monthly histories: what your loan would have paid on IRPH
+  instead of Euríbor, month by month, up to the last month both published.
+- **Scenarios** with index values you choose, always marked as assumptions.
+- **Notifications** when the Banco publishes a new month of an index you watch.
+- **Made for scripts and AI agents:** JSON by default, stable exit codes, machine-readable
+  errors, and the usage guide built into the binary (`hipoteca skills list`).
 
-So this tool does three things a calculator does not:
-
-1. **It refuses to guess.** No escritura data, no answer: `loan_incomplete` names the missing
-   field. An index month that the Banco has not published is `index_not_published`, never an
-   invented value.
-2. **It shows its work.** Every result carries its inputs, the formula applied, and the exact
-   Banco attribution with the data update date.
-3. **It never recommends.** Zero sentences telling you what to do with your money.
-
-## Installation
-
-**Linux and macOS, one line.** Downloads the binary for your platform, **verifies the
-checksum before writing anything**, and installs it:
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aam9063/hipoteca-cli/main/install.sh | sh
+hipoteca doctor
 ```
 
-`HIPOTECA_VERSION=v0.1.0` pins a version; `HIPOTECA_INSTALL_DIR=~/.local/bin` picks the
-destination. A checksum that does not match aborts with nothing written and any previous
-installation untouched.
-
-**From source.** The only path that does not depend on a release. Needs Go 1.26+:
-
-```bash
-git clone https://github.com/aam9063/hipoteca-cli.git
-cd hipoteca-cli
-make build                       # Windows without make: go build -o bin\hipoteca.exe .\cmd\hipoteca
-./bin/hipoteca calc --principal 150000 --rate 3.10 --months 300
-```
-
-Upgrades are handled by `hipoteca update` (or `update --check` to only look), which also
-verifies the checksum and **leaves the previous installation intact if anything fails**.
-
-**macOS and Linux, Homebrew.** A Cask, because goreleaser v2 no longer generates formulae
-for binaries:
+macOS and Linux with Homebrew (a Cask — goreleaser no longer generates formulae for binaries):
 
 ```bash
 brew tap aam9063/tap
 brew install --cask hipoteca
 ```
 
-**Windows, Scoop:**
+Windows with Scoop:
 
 ```powershell
 scoop bucket add aam9063 https://github.com/aam9063/scoop-bucket
 scoop install hipoteca
 ```
 
-## Using it
+From source: Go 1.26+, then `make build` (Windows without make:
+`go build -o bin\hipoteca.exe .\cmd\hipoteca`). Update later with `hipoteca update`.
 
-Register your loan once, from the numbers in your escritura. Nothing is inferred: if you
-leave a field out, the tool tells you which one it needs.
+The installer **verifies the checksum before writing anything**: a mismatch aborts with nothing
+installed and any previous binary untouched.
 
-```bash
-hipoteca loan add casa \
-  --name Casa --type variable \
-  --start-date 2021-06-01 --principal 180000.00 --months 360 \
-  --payment-day 1 --initial-rate 1.25 --initial-period-months 12 \
-  --index euribor-1y --spread 0.89 --revision-every-months 12 \
-  --reference-offset-months 2 --floor none --rate-rounding none --fee-pct 0
-```
-
-Then ask questions:
-
-| Question | Command |
-| --- | --- |
-| How much will my payment change at the next revision? | `hipoteca revision casa` |
-| What happens if I repay €10,000 early? | `hipoteca amortize casa --amount 10000 --mode compare` |
-| What if Euríbor goes to 3 %? | `hipoteca scenario casa --index-values 1.5,2,2.5,3` |
-| Would IRPH have been cheaper? | `hipoteca compare casa --index irph --spread 1.00` |
-| How much is left to pay? | `hipoteca schedule casa` |
-
-Output is one JSON value on stdout. On failure, stdout stays empty and an error envelope
-goes to stderr with an exit code: `2` usage or incomplete data · `4` not found or not
-published · `5` upstream unavailable · `6` network · `7` the API changed.
-
-## For agents
-
-The binary documents itself, so an agent does not have to guess a flag or read this file:
+## Quickstart
 
 ```bash
-hipoteca skills list          # four recipes as JSON
-hipoteca skills list --pretty # the same, as a table for humans
-hipoteca skills get next-revision  # exact commands, flags, and what to do on each error
-hipoteca schema calc          # the output contract, generated from the binary
-hipoteca doctor               # version, paths, indices, saved loans and their missing fields
+# register your loan once, from the numbers in your escritura
+hipoteca loan add casa --name Casa --type variable \
+  --start-date 2021-06-01 --principal 180000 --months 360 --payment-day 1 \
+  --initial-rate 1.25 --initial-period-months 12 --index euribor-1y --spread 0.89 \
+  --revision-every-months 12 --reference-offset-months 2 --floor none --rate-rounding none --fee-pct 0
+
+# how much will my payment change?
+hipoteca revision casa --date 2022-06 --pretty
+
+# what if I repay 10.000 € now?
+hipoteca amortize casa --amount 10000 --date 60 --mode compare --pretty
+
+# what does the next stretch of the schedule look like?
+hipoteca schedule casa --from 2026-11 --to 2027-02 --pretty
+
+# which index is published and when?
+hipoteca index list --pretty
 ```
 
-`schema` and [`docs/cli-spec.md`](docs/cli-spec.md) are generated from the same structures
-the commands write, and a test fails when the committed copy drifts from the binary. A
-reference that drifts lies with authority, which is worse than having none.
+`hipoteca loan add --help` lists every flag. **Nothing is inferred:** if a field from your
+escritura is missing, the calculation refuses with `loan_incomplete` and names it.
 
-[`skills/hipoteca/SKILL.md`](skills/hipoteca/SKILL.md) is a ready-made skill for Pi and
-Claude Code.
-
-## Guarantees
-
-- **Exact decimals, never floats.** Money and rates are `math/big.Rat` internally and
-  `shopspring/decimal` at the API. An AST guard in CI fails on any `float64` in the
-  calculation package.
-- **No invented data.** A missing escritura field, an unpublished index month or an
-  unparseable series is an error with its own code, never a default.
-- **No data leaves your machine.** The only network call is the Banco de España. Notifications
-  are opt-in, and without `--with-impact` the payload contains no loan data at all.
-- **No advice.** No text recommends a decision, and a test enforces it structurally.
-- **Verified against a real bank.** One reference case comes from an actual bank receipt:
-  a June 2021 settlement whose interest, principal, payment and remaining balance match this
-  tool's conventions to the cent.
-
-## How it is validated
-
-Ten reference cases in [`testdata/finance/`](testdata/finance/) are generated outside the Go
-code with `numpy-financial`, cross-checked between two independent methods, and fail loudly
-if they disagree. The index values in those cases are real published Euríbor months, checked
-against captured Banco de España responses in [`testdata/bde/`](testdata/bde/).
-
-The eleventh case is a real bank receipt, transcribed from paper rather than computed. It is
-the only thing that proves the conventions match what a bank actually charges.
-
-Every PR runs on Linux, macOS and Windows: `gofmt`, `go mod tidy`, `go vet`, `staticcheck`,
-`govulncheck` and the full test suite. No PR test touches the network.
-
-## Data and attribution
-
-Indices come from the Banco de España website. Every output that contains data or
-calculations carries an `attribution` block with one of two exact strings and the data update
-date:
-
-- Raw data (`index list`, `index show`, `index latest`):
-  `Fuente: Sitio web del Banco de España (www.bde.es)`
-- Processed data (every calculation):
-  `Elaboración propia con datos extraídos del sitio web del Banco de España (www.bde.es)`
-
-`attribution.data_updated_at` is the publication date (`YYYY-MM-DD`) to cite alongside any
-figure. Terms of use are summarised in [`docs/series.md`](docs/series.md) §8.
-
-**This project is not affiliated with, sponsored by or endorsed by the Banco de España.** It
-does not use their brand or logo and does not imply participation.
-
-## Development
-
-Go 1.26+. `make` is optional; the same commands live in `scripts/`.
-
-```bash
-make build     # bin/hipoteca with real version and commit
-make check     # gofmt, go mod tidy, go vet, staticcheck, govulncheck and tests
-make test      # tests only
-```
-
-`make check` runs `scripts/check.sh`, the same script CI runs on three operating systems. It
-installs `staticcheck` and `govulncheck` into `./.bin` on first use and leaves your `GOPATH`
-alone.
+Output is JSON by default (`| jq`); `--pretty` is for people.
 
 ## Documentation
 
-- [`docs/cli-spec.md`](docs/cli-spec.md) — commands and output contract, generated from the binary.
-- [`docs/calculos.md`](docs/calculos.md) — every calculation convention, in Spanish.
-- [`docs/series.md`](docs/series.md) — index catalogue and API contract.
-- [`docs/ARRANQUE.md`](docs/ARRANQUE.md) — project brief and backlog.
-- [`AGENTS.md`](AGENTS.md) — how to work in this repository.
+| guide | |
+| --- | --- |
+| [CLI reference](docs/cli-spec.md) | every command, flag and output field, generated from the binary |
+| [Calculation conventions](docs/calculos.md) | reference month, floor, rounding, negative rates (Spanish) |
+| [Index catalogue](docs/series.md) | the 14 series, their codes and the API contract (Spanish) |
+| [Agent guide](skills/hipoteca/SKILL.md) | the skill for Pi and Claude Code |
+| [Project brief](docs/ARRANQUE.md) | backlog and principles (Spanish) |
+
+## Good to know
+
+- **Not financial advice.** It calculates and compares; it never recommends. No sentence in any
+  command says what you should do with your money, and a test enforces it structurally.
+- **It may differ from your bank by cents.** Conventions are documented in
+  [`docs/calculos.md`](docs/calculos.md) and validated against a real bank receipt, but day
+  count, rounding and the exact index month come from your escritura. Every output carries its
+  inputs so you can check.
+- **It refuses to guess.** An unpublished index month is `index_not_published`, never a made-up
+  value; a missing escritura field is `loan_incomplete` naming the field.
+- **Your data stays on your machine.** The only network call is the Banco de España. Notifications
+  are opt-in, and without `--with-impact` their payload carries no loan data at all.
+- **It does not connect to your bank** and never asks for credentials.
+- **Exact decimals, never floats.** Money and rates are `math/big.Rat` internally; an AST guard
+  in CI fails on any `float64` in the calculation package.
+- **Not affiliated with the Banco de España.** It uses no brand or logo and implies no
+  participation.
+
+## What it does not do
+
+- **No projections.** `scenario` and `--assume` are marked `assumed: true` because they are your
+  numbers, not published data. Nothing is forecast.
+- **No future revisions past the initial period** without a synchronized receipt. The schedule
+  uses the initial rate and says so; `hipoteca loan sync` takes your last receipt's balance and
+  rate as the new starting point.
+- **No prepayment simulation without the fee from your escritura.** `--fee-pct` exists, but the
+  value has to come from you.
+
+## Development
+
+```bash
+make build     # bin/hipoteca with real version and commit
+make check     # gofmt, go mod tidy, go vet, staticcheck, govulncheck and the full suite
+make test      # tests only
+```
+
+`make check` runs `scripts/check.sh`, the same script CI runs on Linux, macOS and Windows. No PR
+test touches the network: the Banco de España client is tested against captured responses in
+`testdata/bde/`, and the maths against reference cases in `testdata/finance/` — ten generated
+outside Go with `numpy-financial`, and one transcribed from a real bank receipt.
 
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
 
-The project documentation is written in Spanish; code, comments, commit messages and this
-README are in English.
+Project documentation is in Spanish; code, comments, commit messages and this README are in
+English.
