@@ -65,6 +65,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Los runners de windows-latest no traen Scoop: sin esto el job falla con
+      # "The term 'scoop' is not recognized", que es lo que pasaría la primera
+      # vez que alguien lo lanzara.
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          scoop --version
+
       - name: Add the bucket and install the package
         shell: pwsh
         run: |
