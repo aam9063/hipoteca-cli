@@ -193,12 +193,33 @@ func TestSignalWiringIsPresent(t *testing.T) {
 	}
 }
 
-// P-01: `version` writes exactly one JSON value plus its newline to stdout and
-// nothing else.
-func TestVersionWritesExactlyOneJSONValue(t *testing.T) {
+// `version` imprime sólo la versión: es lo que alguien espera del comando y lo
+// que consume install.sh. El commit y la fecha son diagnóstico.
+func TestVersionWritesOnlyTheVersion(t *testing.T) {
 	stdout, stderr, code := run(t, "version")
 	if code != 0 {
 		t.Fatalf("version exited %d, stderr: %s", code, stderr)
+	}
+	if len(stderr) != 0 {
+		t.Errorf("stderr must stay empty on success, got %q", stderr)
+	}
+	if !bytes.HasSuffix(stdout, []byte("\n")) {
+		t.Errorf("stdout must end with a newline, got %q", stdout)
+	}
+	got := strings.TrimSpace(string(stdout))
+	if got == "" {
+		t.Fatal("stdout is empty: se esperaba la versión")
+	}
+	if strings.ContainsAny(got, "{}\n") {
+		t.Fatalf("stdout debe ser sólo la versión, no JSON: %q", got)
+	}
+}
+
+// P-01: con --json, `version` escribe exactamente un valor JSON y su salto.
+func TestVersionJSONWritesExactlyOneJSONValue(t *testing.T) {
+	stdout, stderr, code := run(t, "version", "--json")
+	if code != 0 {
+		t.Fatalf("version --json exited %d, stderr: %s", code, stderr)
 	}
 	if len(stderr) != 0 {
 		t.Errorf("stderr must stay empty on success, got %q", stderr)
