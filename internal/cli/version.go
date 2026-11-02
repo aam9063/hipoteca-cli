@@ -18,9 +18,9 @@ type versionOutput struct {
 }
 
 func newVersionCmd(info BuildInfo) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Muestra la versión, el commit y la fecha de compilación",
+		Short: "Muestra la versión",
 		// Review finding 4: cobra.NoArgs would error before the root wrappers, so
 		// the process would exit 1 (internal) instead of 2 (usage). An Args function
 		// returning an errs error keeps the exit code in the contract table (§6.4).
@@ -33,18 +33,27 @@ func newVersionCmd(info BuildInfo) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			out := versionOutput{
-				SchemaVersion: 1,
-				Version:       info.Version,
-				Commit:        info.Commit,
-				Date:          info.Date,
+			// Por defecto, sólo la versión: es lo que alguien espera de `version`
+			// y lo que consume install.sh. El commit y la fecha son para
+			// diagnóstico y viven en `doctor` o detrás de --json.
+			if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+				out := versionOutput{
+					SchemaVersion: 1,
+					Version:       info.Version,
+					Commit:        info.Commit,
+					Date:          info.Date,
+				}
+				// Review finding 6: output.WriteJSON is the one writer of the CLI;
+				// the version result does not bypass it with its own encoder.
+				if err := output.WriteJSON(cmd.OutOrStdout(), out); err != nil {
+					return fmt.Errorf("escribiendo el resultado: %w", err)
+				}
+				return nil
 			}
-			// Review finding 6: output.WriteJSON is the one writer of the CLI; the
-			// version result does not bypass it with its own encoder.
-			if err := output.WriteJSON(cmd.OutOrStdout(), out); err != nil {
-				return fmt.Errorf("escribiendo el resultado: %w", err)
-			}
-			return nil
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), info.Version)
+			return err
 		},
 	}
+	cmd.Flags().Bool("json", false, "el contrato completo: versión, commit y fecha de compilación")
+	return cmd
 }

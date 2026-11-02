@@ -155,7 +155,7 @@ chmod 0755 "$STAGED"
 mv -f "$STAGED" "$DEST" || die "no se pudo mover el binario a $DEST" 1
 STAGED=""
 
-printf 'Instalado %s en %s\n' "$("$DEST" version 2>/dev/null | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')" "$DEST" >&2
+printf 'Instalado %s en %s\n' "$("$DEST" version 2>/dev/null)" "$DEST" >&2
 
 case ":$PATH:" in
 *":$DEST_DIR:"*) ;;
