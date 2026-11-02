@@ -53,13 +53,13 @@ func updateServer(t *testing.T, binary []byte) *httptest.Server {
 					if ext == "zip" {
 						hash = zipDigest
 					}
-					fmt.Fprintf(w, "%s  hipoteca_%s_%s_%s.%s\n", hash, version, os, arch, ext)
+					fmt.Fprintf(w, "%s  hipoteca-cli_%s_%s_%s.%s\n", hash, version, os, arch, ext)
 				}
 			}
 		}
 	})
 	mux.HandleFunc("/download/v"+version+"/", func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(filepath.Base(r.URL.Path), "hipoteca_") {
+		if !strings.HasPrefix(filepath.Base(r.URL.Path), "hipoteca-cli_") {
 			http.NotFound(w, r)
 			return
 		}
@@ -227,7 +227,7 @@ func TestUpdateChecksumMismatchLeavesPreviousBinaryIntact(t *testing.T) {
 			for _, os := range []string{"linux", "darwin", "windows"} {
 				for _, arch := range []string{"amd64", "arm64"} {
 					for _, ext := range []string{"tar.gz", "zip"} {
-						_, _ = io.WriteString(w, "0000000000000000000000000000000000000000000000000000000000000000  hipoteca_0.2.0_"+os+"_"+arch+"."+ext+"\n")
+						_, _ = io.WriteString(w, "0000000000000000000000000000000000000000000000000000000000000000  hipoteca-cli_0.2.0_"+os+"_"+arch+"."+ext+"\n")
 					}
 				}
 			}
