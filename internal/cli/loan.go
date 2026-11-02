@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/loan"
@@ -292,7 +294,7 @@ func newLoanShowCmd(deps Deps) *cobra.Command {
 
 // newLoanListCmd: `loan list`.
 func newLoanListCmd(deps Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Lista los préstamos guardados con su marca de completo",
 		Args:  noArgs("loan list"),
@@ -305,9 +307,17 @@ func newLoanListCmd(deps Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// --pretty es la vista para humanos (PRETTY-01, S1); el JSON
+			// sigue siendo el defecto: es el contrato de los agentes.
+			if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+				_, err := fmt.Fprint(cmd.OutOrStdout(), renderLoanListTable(res))
+				return err
+			}
 			return writeResult(cmd, res)
 		},
 	}
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: id, nombre, tipo y marca de completo de cada préstamo")
+	return cmd
 }
 
 // newLoanRemoveCmd: `loan remove [<id>] --yes` — sin --yes responde

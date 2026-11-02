@@ -37,7 +37,7 @@ func newIndexCmd(deps Deps) *cobra.Command {
 
 // newIndexListCmd: todos los índices del catálogo con su último valor.
 func newIndexListCmd(deps Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Todos los índices del catálogo con su último valor publicado",
 		Args:  noArgs("index list"),
@@ -50,9 +50,17 @@ func newIndexListCmd(deps Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// --pretty es la vista para humanos (PRETTY-01, S1); el JSON
+			// sigue siendo el defecto: es el contrato de los agentes.
+			if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+				_, err := fmt.Fprint(cmd.OutOrStdout(), renderIndexValuesTable(res))
+				return err
+			}
 			return writeResult(cmd, res)
 		},
 	}
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: id, nombre, último mes y valor de cada índice")
+	return cmd
 }
 
 // newIndexShowCmd: el histórico mensual de un índice para un rango.
