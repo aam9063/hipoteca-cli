@@ -55,3 +55,15 @@ Show
 Type "hipoteca amortize casa --amount 10000 --date 60 --mode compare --pretty"
 Enter
 Sleep 5s
+
+# --- 4. Lo que lee un agente ---
+# No es una conversación: es el texto exacto que un agente consume. Determinista
+# y verificable, a diferencia de una respuesta de un agente, que cambia cada vez.
+Hide
+Type "Clear-Host"
+Enter
+Show
+
+Type "hipoteca skills get next-revision"
+Enter
+Sleep 4s
