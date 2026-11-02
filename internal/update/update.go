@@ -188,14 +188,21 @@ func (u *Updater) shouldUpdate(latest string) bool {
 	return cmp < 0
 }
 
+// projectName es el nombre del PROYECTO, no el del binario. goreleaser nombra
+// los archivos de release con project_name (ver .goreleaser.yaml) y el binario
+// que va dentro con el nombre del build. Confundirlos da 404 en la primera
+// actualización real, y el test unitario no lo ve porque su servidor sirve lo
+// que el código espera.
+const projectName = "hipoteca-cli"
+
 // archiveName reconstruye el nombre del fichero de la plataforma con el
-// patrón de .goreleaser.yaml: hipoteca_<versión>_<os>_<arch>.<ext>.
+// patrón de .goreleaser.yaml: <proyecto>_<versión>_<os>_<arch>.<ext>.
 func (u *Updater) archiveName(version string) string {
 	ext := "tar.gz"
 	if u.goos() == "windows" {
 		ext = "zip"
 	}
-	return fmt.Sprintf("hipoteca_%s_%s_%s.%s", version, u.goos(), u.goarch(), ext)
+	return fmt.Sprintf("%s_%s_%s_%s.%s", projectName, version, u.goos(), u.goarch(), ext)
 }
 
 func (u *Updater) downloadURL(tag, name string) string {
