@@ -23,6 +23,94 @@ import (
 // Deps.ConfigPath) y la capa de aplicación no toca el entorno.
 // ----------------------------------------------------------------------------
 
+// Las convenciones de cálculo soportadas, reexportadas del modelo (REF-01):
+// son los únicos valores válidos y los que el CLI trae por defecto en sus
+// banderas; el valor real lo define internal/loan.
+const (
+	InterestConventionMonthlyNominal = loan.InterestConventionMonthlyNominal
+	PaymentRoundingHalfUpCents       = loan.PaymentRoundingHalfUpCents
+)
+
+// LoanInput son los campos de un préstamo que llegan de un comando del CLI
+// (REF-01): cada campo presente viene de una bandera; los ausentes (nil) no
+// se tocan. Es la forma del CLI de hablar de un préstamo sin conocer el
+// modelo: alta y edición lo traducen a loan.Loan aquí dentro, y la validación
+// de valores sigue siendo de internal/loan.
+type LoanInput struct {
+	Name, Type, StartDate, OriginalPrincipal, InitialRate *string
+	Index, Spread, SpreadUnbonified                       *string
+	TermMonths, PaymentDay, RevisionEveryMonths           *int
+	InitialPeriodMonths, ReferenceOffsetMonths            *int
+	FloorRate, RateRounding, InterestConvention           *string
+	PaymentRounding, EarlyRepaymentFeePct                 *string
+}
+
+// loanOfInput construye el préstamo con los campos presentes en la entrada.
+func loanOfInput(in LoanInput) loan.Loan {
+	var l loan.Loan
+	applyInput(in, &l)
+	return l
+}
+
+// applyInput aplica sobre un préstamo guardado los campos presentes en la
+// entrada: es la edición campo a campo de `loan edit`.
+func applyInput(in LoanInput, l *loan.Loan) {
+	if in.Name != nil {
+		l.Name = *in.Name
+	}
+	if in.Type != nil {
+		l.Type = *in.Type
+	}
+	if in.StartDate != nil {
+		l.StartDate = *in.StartDate
+	}
+	if in.OriginalPrincipal != nil {
+		l.OriginalPrincipal = *in.OriginalPrincipal
+	}
+	if in.TermMonths != nil {
+		l.TermMonths = *in.TermMonths
+	}
+	if in.PaymentDay != nil {
+		l.PaymentDay = *in.PaymentDay
+	}
+	if in.InitialRate != nil {
+		l.InitialRate = *in.InitialRate
+	}
+	if in.InitialPeriodMonths != nil {
+		l.InitialPeriodMonths = in.InitialPeriodMonths
+	}
+	if in.Index != nil {
+		l.Index = *in.Index
+	}
+	if in.Spread != nil {
+		l.Spread = *in.Spread
+	}
+	if in.SpreadUnbonified != nil {
+		l.SpreadUnbonified = *in.SpreadUnbonified
+	}
+	if in.RevisionEveryMonths != nil {
+		l.RevisionEveryMonths = *in.RevisionEveryMonths
+	}
+	if in.ReferenceOffsetMonths != nil {
+		l.ReferenceOffsetMonths = in.ReferenceOffsetMonths
+	}
+	if in.FloorRate != nil {
+		l.FloorRate = in.FloorRate
+	}
+	if in.RateRounding != nil {
+		l.RateRounding = *in.RateRounding
+	}
+	if in.InterestConvention != nil {
+		l.InterestConvention = *in.InterestConvention
+	}
+	if in.PaymentRounding != nil {
+		l.PaymentRounding = *in.PaymentRounding
+	}
+	if in.EarlyRepaymentFeePct != nil {
+		l.EarlyRepaymentFeePct = *in.EarlyRepaymentFeePct
+	}
+}
+
 // loadConfigAt lee la config de la ruta dada.
 func loadConfigAt(path string) (config.Config, error) {
 	return config.Load(path)
@@ -81,9 +169,15 @@ func joinIDs(ids []string) string {
 func loanError(id string, err error) error {
 	var inc *loan.IncompleteError
 	if errors.As(err, &inc) {
+		hint := fmt.Sprintf("completa el campo %q con \"hipoteca loan edit %s\": es un dato de tu escritura y no se supone", inc.Field, id)
+		if inc.Field == loan.FieldEarlyRepaymentFeePct {
+			// REF-04 (S10): la comisión sólo hace falta para amortize, y 0 es
+			// un valor válido: la escritura puede no tener comisión.
+			hint = fmt.Sprintf("completa el campo %q con \"hipoteca loan edit %s\": es un dato de tu escritura y no se supone; si tu préstamo no tiene comisión de amortización, 0 es un valor válido", inc.Field, id)
+		}
 		return errs.New(errs.KindLoanIncomplete,
 			fmt.Sprintf("el préstamo %q no está completo: falta %s", id, inc.Field),
-			fmt.Sprintf("completa el campo %q con \"hipoteca loan edit %s\": es un dato de tu escritura y no se supone", inc.Field, id))
+			hint)
 	}
 	return err
 }
@@ -146,7 +240,7 @@ func LoanList(path string) (LoanListResult, error) {
 			ID:       id,
 			Name:     l.Name,
 			Type:     l.Type,
-			Complete: len(l.MissingFields()) == 0,
+			Complete: len(loan.MissingFields(l)) == 0,
 		})
 	}
 	return LoanListResult{SchemaVersion: model.SchemaVersion, Loans: loans}, nil
@@ -166,7 +260,7 @@ func LoanShow(path, idOrEmpty string) (LoanShowResult, error) {
 		return LoanShowResult{}, err
 	}
 	l := cfg.Loans[id]
-	missing := l.MissingFields()
+	missing := loan.MissingFields(l)
 	view := LoanView{
 		Loan:     l,
 		ID:       id,
@@ -184,12 +278,19 @@ func LoanShow(path, idOrEmpty string) (LoanShowResult, error) {
 
 // LoanAdd guarda un préstamo nuevo con el id dado. El préstamo puede llegar
 // incompleto (es dato del usuario y se guarda tal cual; show lo avisa), pero
-// los valores presentes deben ser válidos y el id no puede existir.
-func LoanAdd(path, id string, l loan.Loan) error {
+// los valores presentes deben ser válidos y el id no puede existir. La
+// validación de los valores va ANTES de abrir la config (igual que cuando la
+// hacía el CLI al construir el préstamo): una bandera inválida es un error
+// de uso aunque la config no se pueda leer.
+func LoanAdd(path, id string, in LoanInput) error {
 	if id == "" {
 		return errs.New(errs.KindUsage,
 			"falta el id del préstamo",
 			"ejemplo: \"hipoteca loan add casa --name Casa --type variable ...\"")
+	}
+	l := loanOfInput(in)
+	if err := loan.ValidateValues(l); err != nil {
+		return loanError(id, err)
 	}
 	cfg, err := loadConfigAt(path)
 	if err != nil {
@@ -200,9 +301,6 @@ func LoanAdd(path, id string, l loan.Loan) error {
 			fmt.Sprintf("ya existe un préstamo guardado con el id %q", id),
 			"usa \"hipoteca loan edit\" para cambiarlo o elige otro id")
 	}
-	if err := l.ValidateValues(); err != nil {
-		return loanError(id, err)
-	}
 	if cfg.Loans == nil {
 		cfg.Loans = map[string]loan.Loan{}
 	}
@@ -210,10 +308,12 @@ func LoanAdd(path, id string, l loan.Loan) error {
 	return cfg.Save(path)
 }
 
-// LoanEdit aplica los cambios de la función apply sobre el préstamo guardado
-// y lo vuelve a guardar. Los valores presentes tras la edición deben seguir
-// siendo válidos; el préstamo puede seguir incompleto a medias.
-func LoanEdit(path, id string, apply func(*loan.Loan)) error {
+// LoanEdit aplica los cambios de la entrada sobre el préstamo guardado y lo
+// vuelve a guardar: sólo se tocan los campos presentes (REF-01: la CLI
+// traduce sus banderas a LoanInput y aquí se decide qué es un cambio). Los
+// valores presentes tras la edición deben seguir siendo válidos; el préstamo
+// puede seguir incompleto a medias.
+func LoanEdit(path, id string, in LoanInput) error {
 	cfg, err := loadConfigAt(path)
 	if err != nil {
 		return err
@@ -224,8 +324,8 @@ func LoanEdit(path, id string, apply func(*loan.Loan)) error {
 			fmt.Sprintf("no hay ningún préstamo guardado con el id %q", id),
 			"\"hipoteca loan list\" muestra los préstamos guardados")
 	}
-	apply(&l)
-	if err := l.ValidateValues(); err != nil {
+	applyInput(in, &l)
+	if err := loan.ValidateValues(l); err != nil {
 		return loanError(id, err)
 	}
 	cfg.Loans[id] = l
@@ -256,10 +356,17 @@ func LoanRemove(path, idOrEmpty string, confirm bool) (string, error) {
 	return id, cfg.Save(path)
 }
 
+// LoanSyncInput son los tres datos del recibo que trae `loan sync` (REF-01).
+type LoanSyncInput struct {
+	Date                 string
+	OutstandingPrincipal string
+	CurrentRate          string
+}
+
 // LoanSync guarda la sincronización con el recibo real: fecha, capital
 // pendiente y tipo vigente (decisión 2 de LOAN-01: a partir de aquí, el
 // capital y el tipo de partida son los del recibo).
-func LoanSync(path, idOrEmpty string, s loan.Sync) error {
+func LoanSync(path, idOrEmpty string, s LoanSyncInput) error {
 	cfg, err := loadConfigAt(path)
 	if err != nil {
 		return err
@@ -287,10 +394,14 @@ func LoanSync(path, idOrEmpty string, s loan.Sync) error {
 			"ejemplo: hipoteca loan sync casa --date 2026-10-01 --outstanding 152341.18 --rate 3.12")
 	}
 	l := cfg.Loans[id]
-	l.Sync = &s
+	l.Sync = &config.Sync{
+		Date:                 s.Date,
+		OutstandingPrincipal: s.OutstandingPrincipal,
+		CurrentRate:          s.CurrentRate,
+	}
 	// La validación de valores incluye los campos del sync (fechas y
 	// decimales); la presencia se comprueba en los propios flags del CLI.
-	if err := l.ValidateValues(); err != nil {
+	if err := loan.ValidateValues(l); err != nil {
 		return loanError(id, err)
 	}
 	cfg.Loans[id] = l
@@ -333,7 +444,7 @@ func LoanPointOf(path, idOrEmpty string) (LoanPoint, error) {
 		return LoanPoint{}, err
 	}
 	l := cfg.Loans[id]
-	if err := l.Validate(); err != nil {
+	if err := loan.Validate(l); err != nil {
 		return LoanPoint{}, loanError(id, err)
 	}
 	balance, rate, remaining, err := currentBalance(l)

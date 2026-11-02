@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/bde"
@@ -239,4 +240,28 @@ func rawAttribution(last time.Time) (model.Attribution, error) {
 // monthString renderiza un mes normalizado en el formato del contrato.
 func monthString(m time.Time) string {
 	return m.Format("2006-01")
+}
+
+// ParseRange traduce el --range del usuario al rango del contrato
+// (docs/series.md §2.3, REF-01: la CLI no conoce internal/bde): 30M, 60M y
+// MAX se pasan tal cual; un año con datos (1990..año en curso) viaja como
+// año. Cualquier otra cosa es usage/2 con la lista de valores aceptados:
+// nada de recortes silenciosos.
+func ParseRange(value string) (bde.Rango, error) {
+	switch value {
+	case "30M":
+		return bde.Rango30M, nil
+	case "60M":
+		return bde.Rango60M, nil
+	case "MAX":
+		return bde.RangoMAX, nil
+	}
+	if year, err := strconv.Atoi(value); err == nil {
+		if year >= 1990 && year <= time.Now().Year() {
+			return bde.RangoAnio(year)
+		}
+	}
+	return bde.Rango{}, errs.New(errs.KindUsage,
+		fmt.Sprintf("el rango %q no es correcto", value),
+		"usa 30M, 60M, MAX o un año con datos (entre 1990 y "+strconv.Itoa(time.Now().Year())+")")
 }

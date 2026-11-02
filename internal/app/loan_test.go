@@ -60,13 +60,33 @@ func configCon(t *testing.T, loans map[string]loan.Loan) string {
 	return path
 }
 
+// inputDeLoan convierte un préstamo en la entrada del CLI (REF-01): cada
+// campo va con puntero; los punteros del propio préstamo (floor, offset,
+// tramo) pasan tal cual porque LoanInput comparte su tipo.
+func inputDeLoan(l loan.Loan) LoanInput {
+	str := func(v string) *string { return &v }
+	ent := func(v int) *int { return &v }
+	return LoanInput{
+		Name: str(l.Name), Type: str(l.Type), StartDate: str(l.StartDate),
+		OriginalPrincipal: str(l.OriginalPrincipal), TermMonths: ent(l.TermMonths),
+		PaymentDay: ent(l.PaymentDay), InitialRate: str(l.InitialRate),
+		InitialPeriodMonths: l.InitialPeriodMonths, Index: str(l.Index),
+		Spread: str(l.Spread), SpreadUnbonified: str(l.SpreadUnbonified),
+		RevisionEveryMonths:   ent(l.RevisionEveryMonths),
+		ReferenceOffsetMonths: l.ReferenceOffsetMonths,
+		FloorRate:             l.FloorRate, RateRounding: str(l.RateRounding),
+		InterestConvention: str(l.InterestConvention), PaymentRounding: str(l.PaymentRounding),
+		EarlyRepaymentFeePct: str(l.EarlyRepaymentFeePct),
+	}
+}
+
 // TestLoanAddYShowIdaYVuelta: lo que se guarda es lo que se muestra, campo a
 // campo, incluidos floor_rate = "" y los punteros.
 func TestLoanAddYShowIdaYVuelta(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	want := prestamoCompleto()
 
-	if err := LoanAdd(path, "casa", want); err != nil {
+	if err := LoanAdd(path, "casa", inputDeLoan(want)); err != nil {
 		t.Fatalf("LoanAdd(): %v", err)
 	}
 	res, err := LoanShow(path, "casa")
@@ -106,10 +126,10 @@ func TestLoanAddYShowIdaYVuelta(t *testing.T) {
 func TestLoanAddDuplicadoYVacio(t *testing.T) {
 	path := configCon(t, map[string]loan.Loan{"casa": prestamoCompleto()})
 
-	if err := LoanAdd(path, "casa", prestamoCompleto()); err == nil {
+	if err := LoanAdd(path, "casa", inputDeLoan(prestamoCompleto())); err == nil {
 		t.Fatal("LoanAdd() sobre un id existente: error = nil, want usage")
 	}
-	err := LoanAdd(path, "", prestamoCompleto())
+	err := LoanAdd(path, "", inputDeLoan(prestamoCompleto()))
 	e := assertAppError(t, err, errs.KindUsage, 2)
 	if e.Message == "" {
 		t.Fatal("el error de id vacío debe llevar mensaje")
@@ -121,7 +141,7 @@ func TestLoanAddValorInvalido(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	l := prestamoCompleto()
 	l.OriginalPrincipal = "mil"
-	if err := LoanAdd(path, "casa", l); err == nil {
+	if err := LoanAdd(path, "casa", inputDeLoan(l)); err == nil {
 		t.Fatal("LoanAdd() con capital inválido: error = nil, want usage")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -217,7 +237,7 @@ func TestLoanEditAplicaYCambia(t *testing.T) {
 	path := configCon(t, map[string]loan.Loan{"casa": prestamoCompleto()})
 
 	nuevoSpread := "1.10"
-	err := LoanEdit(path, "casa", func(l *loan.Loan) { l.Spread = nuevoSpread })
+	err := LoanEdit(path, "casa", LoanInput{Spread: &nuevoSpread})
 	if err != nil {
 		t.Fatalf("LoanEdit(): %v", err)
 	}
@@ -232,7 +252,7 @@ func TestLoanEditAplicaYCambia(t *testing.T) {
 		t.Fatalf("edit no debía tocar el nombre: %q", res.Loan.Name)
 	}
 
-	err = LoanEdit(path, "noexiste", func(l *loan.Loan) {})
+	err = LoanEdit(path, "noexiste", LoanInput{})
 	assertAppError(t, err, errs.KindNotFound, 4)
 }
 
@@ -263,7 +283,7 @@ func TestLoanRemoveConConfirmacion(t *testing.T) {
 func TestLoanSyncGuardaYValida(t *testing.T) {
 	path := configCon(t, map[string]loan.Loan{"casa": prestamoCompleto()})
 
-	s := loan.Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+	s := LoanSyncInput{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
 	if err := LoanSync(path, "casa", s); err != nil {
 		t.Fatalf("LoanSync(): %v", err)
 	}
@@ -277,7 +297,7 @@ func TestLoanSyncGuardaYValida(t *testing.T) {
 		t.Fatalf("sync = %+v, want %+v", res.Loan.Sync, s)
 	}
 
-	malo := loan.Sync{Date: "ayer", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+	malo := LoanSyncInput{Date: "ayer", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
 	if err := LoanSync(path, "casa", malo); err == nil {
 		t.Fatal("LoanSync() con fecha inválida: error = nil, want usage")
 	}
@@ -414,4 +434,23 @@ func containsAll(s string, subs ...string) bool {
 		}
 	}
 	return true
+}
+
+// TestLoanPointOfSinComisionRespondeLoanIncompleteConHintDeCero (REF-04,
+// S10): amortize sí usa la comisión, así que sigue respondiendo
+// loan_incomplete/2 nombrando early_repayment_fee_pct, y el hint explica que
+// 0 es un valor válido cuando la escritura no tiene comisión.
+func TestLoanPointOfSinComisionRespondeLoanIncompleteConHintDeCero(t *testing.T) {
+	sinFee := prestamoCompleto()
+	sinFee.EarlyRepaymentFeePct = ""
+	path := configCon(t, map[string]loan.Loan{"casa": sinFee})
+
+	_, err := LoanPointOf(path, "casa")
+	e := assertAppError(t, err, errs.KindLoanIncomplete, 2)
+	if !containsAll(e.Message, "early_repayment_fee_pct") {
+		t.Fatalf("el mensaje debe nombrar el campo: %q", e.Message)
+	}
+	if !containsAll(e.Hint, "0 es un valor válido") {
+		t.Fatalf("el hint debe explicar que 0 es válido: %q", e.Hint)
+	}
 }

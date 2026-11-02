@@ -1,20 +1,13 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/output"
-	"github.com/aam9063/hipoteca-cli/internal/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -58,9 +51,9 @@ func newWatchAddCmd(deps Deps) *cobra.Command {
 					fmt.Sprintf("\"hipoteca watch add index\" espera el id del índice y ha recibido %d argumento(s)", len(args)-1),
 					"ejemplo: \"hipoteca watch add index euribor-1y\"; \"hipoteca index list\" muestra los disponibles")
 			}
-			if args[0] != watch.KindIndex {
+			if args[0] != app.WatchKindIndex {
 				return errs.New(errs.KindUsage,
-					fmt.Sprintf("el tipo de vigilancia %q no existe; en esta versión sólo hay %q", args[0], watch.KindIndex),
+					fmt.Sprintf("el tipo de vigilancia %q no existe; en esta versión sólo hay %q", args[0], app.WatchKindIndex),
 					"ejemplo: \"hipoteca watch add index euribor-1y\"")
 			}
 			return nil
@@ -267,52 +260,9 @@ func newWatchServiceCmd(deps Deps) *cobra.Command {
 	return cmd
 }
 
-// systemRunner ejecuta el gestor de servicios y devuelve su salida dentro del
-// error: cuando systemctl falla, el motivo útil está en su stderr.
-func systemRunner(name string, args ...string) error {
-	c := exec.Command(name, args...)
-	out, err := c.CombinedOutput()
-	if err != nil {
-		detail := strings.TrimSpace(string(out))
-		if detail == "" {
-			return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
-		}
-		return fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, detail)
-	}
-	return nil
-}
-
-// serviceUnit arma la unidad del servicio con los datos del entorno actual.
-func serviceUnit(deps Deps, interval time.Duration) (watch.ServiceUnit, error) {
-	dataPath, err := deps.dataPath()
-	if err != nil {
-		return watch.ServiceUnit{}, err
-	}
-	execPath, err := os.Executable()
-	if err != nil {
-		return watch.ServiceUnit{}, errs.New(errs.KindInternal,
-			fmt.Sprintf("no se pudo averiguar la ruta del ejecutable: %v", err),
-			"el servicio necesita la ruta absoluta del binario; ejecútalo desde una ruta conocida")
-	}
-	if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
-		execPath = resolved
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return watch.ServiceUnit{}, errs.New(errs.KindInternal,
-			fmt.Sprintf("no se pudo determinar el directorio del usuario: %v", err), "")
-	}
-	unit, err := watch.ServiceUnitFor(runtime.GOOS, home, execPath, filepath.Dir(dataPath), interval)
-	if errors.Is(err, watch.ErrServiceUnsupported) {
-		return watch.ServiceUnit{}, errs.New(errs.KindUsage,
-			fmt.Sprintf("este sistema (%s) no tiene un servicio de usuario soportado", runtime.GOOS),
-			"en Windows ejecuta \"hipoteca watch run --interval 12h\" como tarea programada; install/uninstall sólo existen para systemd y launchd")
-	}
-	if err != nil {
-		return watch.ServiceUnit{}, err
-	}
-	return unit, nil
-}
+// La instalación, retirada y estado del servicio viven en app (REF-01): la
+// CLI resuelve la ruta de la base de datos y parsea el intervalo, y app arma
+// la unidad y habla con el gestor de servicios del sistema.
 
 func newWatchServiceInstallCmd(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
@@ -331,21 +281,7 @@ func newWatchServiceInstallCmd(deps Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			list, err := app.WatchList(dbPath)
-			if err != nil {
-				return err
-			}
-			// S5: un servicio que no vigila nada es una trampa silenciosa.
-			if len(list.Watches) == 0 {
-				return errs.New(errs.KindUsage,
-					"no hay ninguna vigilancia que el servicio pueda atender",
-					"crea una antes con \"hipoteca watch add index euribor-1y --sink <nombre>\"")
-			}
-			unit, err := serviceUnit(deps, interval)
-			if err != nil {
-				return err
-			}
-			state, err := watch.ServiceInstall(unit, systemRunner)
+			state, err := app.WatchServiceInstall(dbPath, interval)
 			if err != nil {
 				return err
 			}
@@ -362,11 +298,11 @@ func newWatchServiceUninstallCmd(deps Deps) *cobra.Command {
 		Short: "Retira el servicio y no deja restos",
 		Args:  noArgs("watch service uninstall"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			unit, err := serviceUnit(deps, 12*time.Hour)
+			dbPath, err := deps.dataPath()
 			if err != nil {
 				return err
 			}
-			state, err := watch.ServiceUninstall(unit, systemRunner)
+			state, err := app.WatchServiceUninstall(dbPath, 12*time.Hour)
 			if err != nil {
 				return err
 			}
@@ -381,11 +317,11 @@ func newWatchServiceStatusCmd(deps Deps) *cobra.Command {
 		Short: "Dice si el servicio está instalado",
 		Args:  noArgs("watch service status"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			unit, err := serviceUnit(deps, 12*time.Hour)
+			dbPath, err := deps.dataPath()
 			if err != nil {
 				return err
 			}
-			state, err := watch.ServiceStatusOf(unit)
+			state, err := app.WatchServiceStatus(dbPath)
 			if err != nil {
 				return err
 			}

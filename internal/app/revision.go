@@ -106,7 +106,10 @@ func Revision(ctx context.Context, rt *Runtime, p RevisionParams) (RevisionResul
 		return RevisionResult{}, err
 	}
 	l := cfg.Loans[id]
-	if err := l.Validate(); err != nil {
+	// REF-04 (S9): la comisión de amortización no interviene en una revisión,
+	// así que su ausencia no impide calcular (ValidateWithoutFee). Los demás
+	// datos de la escritura siguen siendo obligatorios (S11).
+	if err := loan.ValidateWithoutFee(l); err != nil {
 		return RevisionResult{}, loanError(id, err)
 	}
 	// Un préstamo fijo no tiene revisiones de tipo: no hay nada que revisar y

@@ -5,6 +5,7 @@ import (
 
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/loan"
+	"github.com/aam9063/hipoteca-cli/internal/model"
 )
 
 // ----------------------------------------------------------------------------
@@ -159,15 +160,31 @@ func TestScheduleDesdeSync(t *testing.T) {
 	}
 }
 
-// TestScheduleIncompletoYPrestamos: schedule con un préstamo incompleto da
-// loan_incomplete/2 y con varios préstamos y sin id, usage/2 listando ids.
+// TestScheduleIncompletoYPrestamos: schedule con un préstamo al que le falta
+// un dato de la escritura (distinto de la comisión) da loan_incomplete/2 y
+// con varios préstamos y sin id, usage/2 listando ids. La comisión de
+// amortización NO es de los que schedule usa (REF-04, S9): sin ella el cuadro
+// se calcula igual.
 func TestScheduleIncompletoYPrestamos(t *testing.T) {
-	incompleto := prestamoCaso01()
-	incompleto.EarlyRepaymentFeePct = ""
-	path := configCon(t, map[string]loan.Loan{"caso": incompleto})
-	_, err := Schedule(ScheduleParams{ConfigPath: path, LoanID: "caso"})
+	sinFee := prestamoCaso01()
+	sinFee.EarlyRepaymentFeePct = ""
+	path := configCon(t, map[string]loan.Loan{"caso": sinFee})
+	res, err := Schedule(ScheduleParams{ConfigPath: path, LoanID: "caso"})
+	if err != nil {
+		t.Fatalf("Schedule() sin comisión: %v, want el cuadro (REF-04)", err)
+	}
+	if res.SchemaVersion != model.SchemaVersion || len(res.Rows) == 0 {
+		t.Fatalf("Schedule() sin comisión = %+v, want el cuadro completo", res)
+	}
+
+	// Un dato que schedule sí necesita (el suelo de la escritura) ausente
+	// sigue siendo loan_incomplete/2 nombrando el campo.
+	sinSuelo := prestamoCaso01()
+	sinSuelo.FloorRate = nil
+	path = configCon(t, map[string]loan.Loan{"caso": sinSuelo})
+	_, err = Schedule(ScheduleParams{ConfigPath: path, LoanID: "caso"})
 	e := assertAppError(t, err, errs.KindLoanIncomplete, 2)
-	if !containsAll(e.Message, "early_repayment_fee_pct") {
+	if !containsAll(e.Message, "floor_rate") {
 		t.Fatalf("el mensaje debe nombrar el campo: %q", e.Message)
 	}
 

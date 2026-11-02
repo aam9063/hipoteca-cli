@@ -91,6 +91,43 @@ From source: Go 1.26+, then `make build` (Windows without make:
 The installer **verifies the checksum before writing anything**: a mismatch aborts with nothing
 installed and any previous binary untouched.
 
+## Uninstall
+
+`hipoteca uninstall` removes the data the tool keeps on your machine — and **never the binary**,
+which belongs to whoever installed it:
+
+| what | where (Windows) | |
+| --- | --- | --- |
+| config (your saved loans) | `%APPDATA%\hipoteca-cli\config.toml` | deleted |
+| database (watches, months seen) | `%LOCALAPPDATA%\hipoteca-cli\hipoteca.db` | deleted |
+| series cache | `%LOCALAPPDATA%\hipoteca-cli\` | deleted |
+
+On Linux and macOS the same three live under `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and
+`$XDG_CACHE_HOME` (or the platform defaults). Without `--yes` nothing is deleted
+(`confirmation_required`); `--dry-run` lists the paths and their sizes without touching them:
+
+```bash
+hipoteca uninstall --dry-run   # see what would go, and how much it is
+hipoteca uninstall --yes       # delete config, database and cache
+```
+
+The binary itself is removed by the channel that installed it:
+
+```bash
+# macOS / Linux, Homebrew
+brew uninstall --cask hipoteca
+
+# Windows, Scoop
+scoop uninstall hipoteca
+
+# installed with install.sh: delete the binary from the install directory
+# (default ~/.local/bin or /usr/local/bin; HIPOTECA_INSTALL_DIR overrides it)
+rm ~/.local/bin/hipoteca
+```
+
+`hipoteca watch service uninstall` (WATCH-01) also removes the notification service if you
+installed one; it does not touch your data.
+
 ## Quickstart
 
 ```bash
