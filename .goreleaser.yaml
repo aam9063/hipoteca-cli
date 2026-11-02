@@ -82,6 +82,9 @@ homebrew_casks:
 
 scoops:
   - name: hipoteca
+    # Scoop sólo busca manifiestos en bucket/ del repo del bucket. En la raíz el
+    # bucket se añade bien y luego falla con "Couldn't find manifest for 'hipoteca'".
+    directory: bucket
     repository:
       owner: aam9063
       name: scoop-bucket
