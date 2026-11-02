@@ -121,10 +121,10 @@ func releaseFiles(t *testing.T, tag, version string, binary []byte, goos, goarch
 	var archive []byte
 	archiveName := ""
 	if goos == "windows" {
-		archiveName = fmt.Sprintf("hipoteca_%s_%s_%s.zip", version, goos, goarch)
+		archiveName = fmt.Sprintf("hipoteca-cli_%s_%s_%s.zip", version, goos, goarch)
 		archive = buildZip(t, map[string][]byte{"hipoteca.exe": binary})
 	} else {
-		archiveName = fmt.Sprintf("hipoteca_%s_%s_%s.tar.gz", version, goos, goarch)
+		archiveName = fmt.Sprintf("hipoteca-cli_%s_%s_%s.tar.gz", version, goos, goarch)
 		archive = buildTarGz(t, map[string][]byte{"hipoteca": binary})
 	}
 	hexes := map[string]string{archiveName: sha256hex(archive)}
@@ -388,7 +388,7 @@ func TestApplyWithoutUpdateTouchesNothing(t *testing.T) {
 func TestApplyChecksumMismatchLeavesPreviousBinaryIntact(t *testing.T) {
 	bin := []byte("binario-nuevo-corrupto")
 	files := releaseFiles(t, "v0.2.0", "0.2.0", bin, "linux", "amd64",
-		map[string]string{"hipoteca_0.2.0_linux_amd64.tar.gz": sha256hex([]byte("otra-cosa-por-la-que-el-checksum-no-cuadra"))})
+		map[string]string{"hipoteca-cli_0.2.0_linux_amd64.tar.gz": sha256hex([]byte("otra-cosa-por-la-que-el-checksum-no-cuadra"))})
 	srv := fakeServerFor(t, nil, 0, files)
 	up, dest := testUpdater(t, srv, "0.1.0")
 	writeFile(t, dest, []byte("binario-viejo"), 0o755)
@@ -426,8 +426,8 @@ func TestApplyCorruptArchiveLeavesPreviousBinaryIntact(t *testing.T) {
 	archive := []byte("esto no es un tar.gz, son bytes corruptos")
 	files := map[string][]byte{
 		"/api/latest":                    []byte(`{"tag_name":"v0.2.0","html_url":"u"}`),
-		"/download/v0.2.0/checksums.txt": []byte(sha256hex(archive) + "  hipoteca_0.2.0_linux_amd64.tar.gz\n"),
-		"/download/v0.2.0/hipoteca_0.2.0_linux_amd64.tar.gz": archive,
+		"/download/v0.2.0/checksums.txt": []byte(sha256hex(archive) + "  hipoteca-cli_0.2.0_linux_amd64.tar.gz\n"),
+		"/download/v0.2.0/hipoteca-cli_0.2.0_linux_amd64.tar.gz": archive,
 	}
 	srv := fakeServerFor(t, nil, 0, files)
 	up, dest := testUpdater(t, srv, "0.1.0")
@@ -476,7 +476,7 @@ func TestApplyMissingAssetLeavesPreviousBinaryIntact(t *testing.T) {
 	// servidor: 404 en la descarga del fichero.
 	files := map[string][]byte{
 		"/api/latest":                    []byte(`{"tag_name":"v0.2.0","html_url":"u"}`),
-		"/download/v0.2.0/checksums.txt": []byte(sha256hex([]byte("x")) + "  hipoteca_0.2.0_linux_amd64.tar.gz\n"),
+		"/download/v0.2.0/checksums.txt": []byte(sha256hex([]byte("x")) + "  hipoteca-cli_0.2.0_linux_amd64.tar.gz\n"),
 	}
 	srv := fakeServerFor(t, nil, 0, files)
 	up, dest := testUpdater(t, srv, "0.1.0")
@@ -496,7 +496,7 @@ func TestApplyChecksumsMissingEntryLeavesBinaryIntact(t *testing.T) {
 	// fichero existe en el servidor, pero el checksums.txt no lo lista.
 	up.Arch = "arm64"
 	extra := buildTarGz(t, map[string][]byte{"hipoteca": []byte("binario-nuevo-arm64")})
-	srv.files["/download/v0.2.0/hipoteca_0.2.0_linux_arm64.tar.gz"] = extra
+	srv.files["/download/v0.2.0/hipoteca-cli_0.2.0_linux_arm64.tar.gz"] = extra
 	writeFile(t, dest, []byte("binario-viejo"), 0o755)
 
 	_, err := up.Apply(context.Background())
@@ -560,5 +560,23 @@ func TestExtractRejectsArchiveWithoutBinary(t *testing.T) {
 		t.Fatal("un fichero sin hipoteca debe fallar")
 	} else if env, ok := errs.From(err); !ok || env.Error.Type != string(errs.KindAPIChanged) {
 		t.Errorf("kind = %+v, want api_changed", env)
+	}
+}
+
+// El nombre del asset sale de project_name en .goreleaser.yaml, no de una
+// constante escrita a mano: escribirlo a mano fue lo que dejó pasar el 404 de
+// la primera actualización real.
+func TestArchiveNameUsesTheProjectName(t *testing.T) {
+	want := projectNameFromGoreleaser(t)
+	if projectName != want {
+		t.Fatalf("projectName = %q, .goreleaser.yaml dice %q", projectName, want)
+	}
+	u := &Updater{OS: "linux", Arch: "amd64"}
+	if got := u.archiveName("0.1.1"); got != want+"_0.1.1_linux_amd64.tar.gz" {
+		t.Fatalf("archiveName = %q, se esperaba %s_0.1.1_linux_amd64.tar.gz", got, want)
+	}
+	w := &Updater{OS: "windows", Arch: "arm64"}
+	if got := w.archiveName("0.1.1"); got != want+"_0.1.1_windows_arm64.zip" {
+		t.Fatalf("archiveName windows = %q", got)
 	}
 }
