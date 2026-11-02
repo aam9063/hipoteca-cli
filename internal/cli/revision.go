@@ -64,10 +64,18 @@ no es un dato oficial.`,
 			if err != nil {
 				return err
 			}
+			// --pretty es la vista para humanos (PRETTY-01, S3/S5): la tabla
+			// y su línea de resumen con la atribución del Banco. El JSON
+			// sigue siendo el defecto: es el contrato de los agentes.
+			if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+				_, err := fmt.Fprint(cmd.OutOrStdout(), renderRevisionTable(res))
+				return err
+			}
 			return writeResult(cmd, res)
 		},
 	}
 	cmd.Flags().String("date", "", "mes o fecha de la revisión (YYYY-MM o YYYY-MM-DD); por defecto, la próxima revisión posterior al mes en curso, p. ej. 2027-01")
 	cmd.Flags().String("assume", "", "valor del índice supuesto en tanto por ciento, p. ej. 2.35: calcula un escenario marcado como assumed en lugar de leer el valor publicado")
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: la revisión en filas campo-valor, con el mes del índice y la atribución en el resumen")
 	return cmd
 }

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/spf13/cobra"
 )
@@ -43,10 +45,18 @@ son siempre los del cuadro completo.`,
 			if err != nil {
 				return err
 			}
+			// --pretty es la vista para humanos (PRETTY-01, S3/S5): el cuadro
+			// y su resumen con el número de filas y el capital final. El JSON
+			// sigue siendo el defecto: es el contrato de los agentes.
+			if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+				_, err := fmt.Fprint(cmd.OutOrStdout(), renderScheduleTable(res))
+				return err
+			}
 			return writeResult(cmd, res)
 		},
 	}
 	cmd.Flags().String("from", "", "primer mes del tramo a mostrar (YYYY-MM o YYYY-MM-DD), p. ej. 2027-01")
 	cmd.Flags().String("to", "", "último mes del tramo a mostrar (YYYY-MM o YYYY-MM-DD), p. ej. 2027-12")
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: una fila por cuota, con el número de filas y el capital final en el resumen")
 	return cmd
 }

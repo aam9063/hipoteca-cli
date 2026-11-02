@@ -61,6 +61,11 @@ const specContractIntro = "## Contrato de salida\n\n" +
 	"(`--help`) son las únicas salidas en texto plano. Los importes y los tipos van como\n" +
 	"cadenas decimales exactas (`\"152341.18\"`), nunca como float. `schema_version` es la\n" +
 	"versión del contrato: %d.\n\n" +
+	"`skills list`, `index list`, `revision`, `amortize`, `schedule` y `loan list` ofrecen\n" +
+	"además `--pretty`: una tabla legible para humanos, de ancho fijo y en formato es-ES,\n" +
+	"con una línea de resumen bajo la tabla. Es opt-in: sin la bandera el resultado es y\n" +
+	"sigue siendo un único valor JSON, y los importes de la tabla se formatean a partir de\n" +
+	"los mismos decimales exactos del contrato, nunca de un float.\n\n" +
 	"En caso de error no hay resultado: el sobre de error va a **stderr** con un código de\n" +
 	"salida estable (§6.4). La tabla de abajo es la misma que produce `hipoteca schema`;\n" +
 	"el 0 de éxito no aparece en ella porque no es un error.\n\n" +

@@ -61,6 +61,7 @@ Uso: `hipoteca amortize [id] [flags]`
 | `--fee-pct` | `string` | `0` | comisión por la amortización anticipada en tanto por ciento del importe, p. ej. 0.50 (por defecto 0; se paga aparte y no reduce el capital; con préstamo guardado se usa la comisión de la escritura y la bandera no se admite) |
 | `--mode` | `string` | `*(vacío)*` | modo de la amortización: reduce-payment, reduce-term o compare (devuelve las dos opciones, sin recomendar) |
 | `--months` | `int` | `0` | plazo total en meses, p. ej. 300 (no se admite con un préstamo guardado) |
+| `--pretty` | `bool` | `false` | tabla legible para humanos: las dos opciones en columnas (en compare), con el modo y el ahorro en el resumen |
 | `--principal` | `string` | `*(vacío)*` | capital del préstamo en euros, p. ej. 150000.00 (no se admite con un préstamo guardado) |
 | `--rate` | `string` | `*(vacío)*` | tipo nominal anual en tanto por ciento, p. ej. 3.10 (no se admite con un préstamo guardado) |
 
@@ -208,7 +209,11 @@ Uso: `hipoteca index latest <id>...`
 
 Todos los índices del catálogo con su último valor publicado
 
-Uso: `hipoteca index list`
+Uso: `hipoteca index list [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--pretty` | `bool` | `false` | tabla legible para humanos: id, nombre, último mes y valor de cada índice |
 
 #### `hipoteca index show`
 
@@ -294,7 +299,11 @@ Uso: `hipoteca loan edit <id> [flags]`
 
 Lista los préstamos guardados con su marca de completo
 
-Uso: `hipoteca loan list`
+Uso: `hipoteca loan list [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--pretty` | `bool` | `false` | tabla legible para humanos: id, nombre, tipo y marca de completo de cada préstamo |
 
 #### `hipoteca loan remove`
 
@@ -352,6 +361,7 @@ Uso: `hipoteca revision [id] [flags]`
 |---|---|---|---|
 | `--assume` | `string` | `*(vacío)*` | valor del índice supuesto en tanto por ciento, p. ej. 2.35: calcula un escenario marcado como assumed en lugar de leer el valor publicado |
 | `--date` | `string` | `*(vacío)*` | mes o fecha de la revisión (YYYY-MM o YYYY-MM-DD); por defecto, la próxima revisión posterior al mes en curso, p. ej. 2027-01 |
+| `--pretty` | `bool` | `false` | tabla legible para humanos: la revisión en filas campo-valor, con el mes del índice y la atribución en el resumen |
 
 ### `hipoteca scenario`
 
@@ -389,6 +399,7 @@ Uso: `hipoteca schedule [id] [flags]`
 | Bandera | Tipo | Valor por defecto | Descripción |
 |---|---|---|---|
 | `--from` | `string` | `*(vacío)*` | primer mes del tramo a mostrar (YYYY-MM o YYYY-MM-DD), p. ej. 2027-01 |
+| `--pretty` | `bool` | `false` | tabla legible para humanos: una fila por cuota, con el número de filas y el capital final en el resumen |
 | `--to` | `string` | `*(vacío)*` | último mes del tramo a mostrar (YYYY-MM o YYYY-MM-DD), p. ej. 2027-12 |
 
 ### `hipoteca schema`
@@ -566,6 +577,12 @@ Todos los comandos escriben **un único valor JSON** en stdout, con un salto fin
 (`--help`) son las únicas salidas en texto plano. Los importes y los tipos van como
 cadenas decimales exactas (`"152341.18"`), nunca como float. `schema_version` es la
 versión del contrato: 1.
+
+`skills list`, `index list`, `revision`, `amortize`, `schedule` y `loan list` ofrecen
+además `--pretty`: una tabla legible para humanos, de ancho fijo y en formato es-ES,
+con una línea de resumen bajo la tabla. Es opt-in: sin la bandera el resultado es y
+sigue siendo un único valor JSON, y los importes de la tabla se formatean a partir de
+los mismos decimales exactos del contrato, nunca de un float.
 
 En caso de error no hay resultado: el sobre de error va a **stderr** con un código de
 salida estable (§6.4). La tabla de abajo es la misma que produce `hipoteca schema`;

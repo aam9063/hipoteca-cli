@@ -6,10 +6,8 @@ import (
 	"github.com/aam9063/hipoteca-cli/internal/skills"
 )
 
-// prettyWidth es el ancho al que se envuelve la descripción. No se lee del
-// terminal a propósito: el resultado tiene que ser el mismo en cualquier
-// máquina y en los tests, sin simular un TTY.
-const prettyWidth = 72
+// prettyWidth, padRight y wrapLines viven en pretty.go: un solo sitio para
+// el ancho fijo y los primitivos de las tablas --pretty (T1 de PRETTY-01).
 
 // renderSkillsTable devuelve la tabla de recetas: id a la izquierda, resumen a
 // la derecha. Es la vista para humanos de lo mismo que `skills list` publica en
@@ -53,37 +51,5 @@ func renderSkillsTable(list []skills.Summary) string {
 	return b.String()
 }
 
-// padRight rellena con espacios hasta el ancho indicado. Cuenta runas, no
-// bytes: los ids son ASCII, pero un acento en el futuro no debe descuadrar la
-// tabla.
-func padRight(s string, width int) string {
-	n := len([]rune(s))
-	if n >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-n)
-}
-
-// wrapLines parte texto en líneas de como mucho width runas, cortando por
-// palabras. Una palabra más larga que width queda sola en su línea en vez de
-// partirse: no hay guiones que insertar sin inventar.
-func wrapLines(text string, width int) []string {
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return nil
-	}
-	if width < 1 {
-		width = 1
-	}
-	var lines []string
-	current := words[0]
-	for _, w := range words[1:] {
-		if len([]rune(current))+1+len([]rune(w)) <= width {
-			current += " " + w
-			continue
-		}
-		lines = append(lines, current)
-		current = w
-	}
-	return append(lines, current)
-}
+// padRight y wrapLines viven en pretty.go, compartidas por todas las tablas
+// --pretty.
