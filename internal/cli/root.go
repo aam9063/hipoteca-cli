@@ -138,7 +138,9 @@ compara, no recomienda. No está afiliada ni respaldada por el Banco de España.
 		// diagnóstico y la configuración.
 		newSkillsCmd(), newSchemaCmd(), newDoctorCmd(info, deps), newConfigCmd(deps),
 		// REL-01: la actualización del propio binario.
-		newUpdateCmd(info, deps))
+		newUpdateCmd(info, deps),
+		// REF-03: el borrado de los datos locales (nunca del binario).
+		newUninstallCmd(deps))
 
 	// Flag parse errors (unknown flag, bad value) are also usage errors of the
 	// contract; the root func propagates to every subcommand.

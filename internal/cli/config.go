@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"strings"
-
 	"github.com/aam9063/hipoteca-cli/internal/app"
-	"github.com/aam9063/hipoteca-cli/internal/bde"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/spf13/cobra"
 )
@@ -76,9 +73,9 @@ func newConfigGetCmd(deps Deps) *cobra.Command {
 }
 
 // newConfigSetCmd: declara o cambia una clave. Para las claves de índices el
-// id se valida contra el catálogo (el runtime lo trae); los sinks se
-// validan por forma. Un préstamo nunca se edita desde aquí: el hint manda a
-// `loan edit`.
+// id se valida contra el catálogo (REF-01: lo resuelve app, que decide
+// cuándo hace falta); los sinks se validan por forma. Un préstamo nunca se
+// edita desde aquí: el hint manda a `loan edit`.
 func newConfigSetCmd(deps Deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <clave> <valor>",
@@ -96,23 +93,11 @@ no desde aquí.`,
 		Args: exactArgs("config set", 2, "ejemplo: hipoteca config set sinks.ntfy.url https://ntfy.sh/mi-topic"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
-			// El catálogo sólo hace falta para los overrides de índices:
-			// `sinks.*` no toca la red ni necesita runtime. Un fallo del
-			// runtime se propaga tal cual: es del contrato (config ilegible,
-			// override inválido).
-			var catalog *bde.Catalog
-			if strings.HasPrefix(key, "indices.") {
-				rt, err := deps.runtime()
-				if err != nil {
-					return err
-				}
-				catalog = rt.Catalog
-			}
 			path, err := deps.configPath()
 			if err != nil {
 				return err
 			}
-			res, err := app.ConfigSet(path, catalog, key, value)
+			res, err := app.ConfigSet(path, key, value, deps.runtime)
 			if err != nil {
 				return err
 			}

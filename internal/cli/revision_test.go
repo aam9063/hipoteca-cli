@@ -26,7 +26,7 @@ func TestE2ERevisionFijaRespondeUsage(t *testing.T) {
 			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
 			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
 		}
-		if err := app.LoanAdd(path, "casa", l); err != nil {
+		if err := app.LoanAdd(path, "casa", loanInputDe(l)); err != nil {
 			t.Fatalf("setup: loan add: %v", err)
 		}
 	})

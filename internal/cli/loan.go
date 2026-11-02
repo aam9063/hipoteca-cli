@@ -5,7 +5,6 @@ import (
 
 	"github.com/aam9063/hipoteca-cli/internal/app"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
-	"github.com/aam9063/hipoteca-cli/internal/loan"
 	"github.com/spf13/cobra"
 )
 
@@ -55,93 +54,75 @@ func flagsPrestamo(cmd *cobra.Command) {
 	cmd.Flags().Int("reference-offset-months", 0, "meses de índice antes del mes de revisión, según escritura, p. ej. 2 (0 es un valor válido)")
 	cmd.Flags().String("floor", "", "suelo del tipo en tanto por ciento, p. ej. 2.00; usa none o cadena vacía para sin suelo (dato de la escritura: no se supone)")
 	cmd.Flags().String("rate-rounding", "", "redondeo de escritura del tipo: none, 1/8, 1/4 o 0.05")
-	cmd.Flags().String("interest-convention", loan.InterestConventionMonthlyNominal, "convención de interés (sólo se soporta monthly-nominal)")
-	cmd.Flags().String("payment-rounding", loan.PaymentRoundingHalfUpCents, "redondeo de la cuota (sólo se soporta half-up-cents)")
+	cmd.Flags().String("interest-convention", app.InterestConventionMonthlyNominal, "convención de interés (sólo se soporta monthly-nominal)")
+	cmd.Flags().String("payment-rounding", app.PaymentRoundingHalfUpCents, "redondeo de la cuota (sólo se soporta half-up-cents)")
 	cmd.Flags().String("fee-pct", "", "comisión de amortización anticipada en tanto por ciento del importe, p. ej. 0.50; usa 0 si tu escritura no la tiene")
 }
 
-// prestamoDeFlags construye un préstamo con las banderas que llegaron
-// cambiadas (add guarda tal cual, aunque queden campos de la escritura sin
-// declarar: es dato del usuario y show avisa). El suelo "none" o vacío es
-// "sin suelo" explícito. NO valida: `add` guarda el préstamo completo de las
-// banderas y valida ése antes de escribir; `edit` fusiona sobre el guardado
-// y valida el resultado fusionado en LoanEdit, porque las banderas solas no
-// describen el préstamo resultante (validarlas solas rechazaría cambiar un
-// solo campo, p. ej. el tipo no llega y no es un error).
-func prestamoDeFlags(cmd *cobra.Command) (loan.Loan, error) {
+// cambiosDeFlags traduce las banderas que llegaron cambiadas a la entrada de
+// app (REF-01: la CLI no construye el préstamo, pide a app). Cada campo
+// presente va con puntero; los ausentes no se tocan. add guarda tal cual,
+// aunque queden campos de la escritura sin declarar: es dato del usuario y
+// show avisa. El suelo "none" o vacío es "sin suelo" explícito. La validación
+// de valores ocurre en app: `add` valida el préstamo construido de las
+// banderas antes de abrir la config; `edit` fusiona sobre el guardado y
+// valida el resultado fusionado, porque las banderas solas no describen el
+// préstamo resultante (validarlas solas rechazaría cambiar un solo campo,
+// p. ej. el tipo no llega y no es un error).
+func cambiosDeFlags(cmd *cobra.Command) app.LoanInput {
 	flags := cmd.Flags()
-	var l loan.Loan
-	if flags.Changed("name") {
-		l.Name, _ = flags.GetString("name")
+	str := func(name string) *string {
+		if flags.Changed(name) {
+			v, _ := flags.GetString(name)
+			return &v
+		}
+		return nil
 	}
-	if flags.Changed("type") {
-		l.Type, _ = flags.GetString("type")
+	entero := func(name string) *int {
+		if flags.Changed(name) {
+			v, _ := flags.GetInt(name)
+			return &v
+		}
+		return nil
 	}
-	if flags.Changed("start-date") {
-		l.StartDate, _ = flags.GetString("start-date")
-	}
-	if flags.Changed("principal") {
-		l.OriginalPrincipal, _ = flags.GetString("principal")
-	}
-	if flags.Changed("months") {
-		l.TermMonths, _ = flags.GetInt("months")
-	}
-	if flags.Changed("payment-day") {
-		l.PaymentDay, _ = flags.GetInt("payment-day")
-	}
-	if flags.Changed("initial-rate") {
-		l.InitialRate, _ = flags.GetString("initial-rate")
-	}
-	if flags.Changed("initial-period-months") {
-		v, _ := flags.GetInt("initial-period-months")
-		l.InitialPeriodMonths = &v
-	}
-	if flags.Changed("index") {
-		l.Index, _ = flags.GetString("index")
-	}
-	if flags.Changed("spread") {
-		l.Spread, _ = flags.GetString("spread")
-	}
-	if flags.Changed("spread-unbonified") {
-		l.SpreadUnbonified, _ = flags.GetString("spread-unbonified")
-	}
-	if flags.Changed("revision-every-months") {
-		l.RevisionEveryMonths, _ = flags.GetInt("revision-every-months")
-	}
-	if flags.Changed("reference-offset-months") {
-		v, _ := flags.GetInt("reference-offset-months")
-		l.ReferenceOffsetMonths = &v
-	}
+	var in app.LoanInput
+	in.Name = str("name")
+	in.Type = str("type")
+	in.StartDate = str("start-date")
+	in.OriginalPrincipal = str("principal")
+	in.TermMonths = entero("months")
+	in.PaymentDay = entero("payment-day")
+	in.InitialRate = str("initial-rate")
+	in.InitialPeriodMonths = entero("initial-period-months")
+	in.Index = str("index")
+	in.Spread = str("spread")
+	in.SpreadUnbonified = str("spread-unbonified")
+	in.RevisionEveryMonths = entero("revision-every-months")
+	in.ReferenceOffsetMonths = entero("reference-offset-months")
 	if flags.Changed("floor") {
 		v, _ := flags.GetString("floor")
 		if v == "none" {
 			v = ""
 		}
-		l.FloorRate = &v
+		in.FloorRate = &v
 	}
-	if flags.Changed("rate-rounding") {
-		l.RateRounding, _ = flags.GetString("rate-rounding")
-	}
-	l.InterestConvention, _ = flags.GetString("interest-convention")
-	l.PaymentRounding, _ = flags.GetString("payment-rounding")
-	if flags.Changed("fee-pct") {
-		l.EarlyRepaymentFeePct, _ = flags.GetString("fee-pct")
-	}
-	return l, nil
+	in.RateRounding = str("rate-rounding")
+	in.InterestConvention = str("interest-convention")
+	in.PaymentRounding = str("payment-rounding")
+	in.EarlyRepaymentFeePct = str("fee-pct")
+	return in
 }
 
-// prestamoDeFlagsValidado es la variante de `add`: el préstamo construido
-// con las banderas es el que se guarda entero, así que se valida tal cual
-// antes de abrir la config.
-func prestamoDeFlagsValidado(cmd *cobra.Command) (loan.Loan, error) {
-	l, err := prestamoDeFlags(cmd)
-	if err != nil {
-		return loan.Loan{}, err
-	}
-	if err := l.ValidateValues(); err != nil {
-		return loan.Loan{}, err
-	}
-	return l, nil
+// altaDeFlags es la variante de `add`: el préstamo se guarda entero desde las
+// banderas, así que las convenciones de cálculo entran siempre (sus valores
+// por defecto son los únicos soportados), lleguen cambiadas o no.
+func altaDeFlags(cmd *cobra.Command) app.LoanInput {
+	in := cambiosDeFlags(cmd)
+	convencion, _ := cmd.Flags().GetString("interest-convention")
+	in.InterestConvention = &convencion
+	redondeo, _ := cmd.Flags().GetString("payment-rounding")
+	in.PaymentRounding = &redondeo
+	return in
 }
 
 // newLoanAddCmd: `loan add <id>` con las banderas del préstamo. Guarda
@@ -153,15 +134,12 @@ func newLoanAddCmd(deps Deps) *cobra.Command {
 		Short: "Guarda un préstamo nuevo en la config local",
 		Args:  exactArgs("loan add", 1, "ejemplo: hipoteca loan add casa --name Casa --type variable --start-date 2021-06-01 --principal 180000 --months 360"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			l, err := prestamoDeFlagsValidado(cmd)
-			if err != nil {
-				return err
-			}
+			in := altaDeFlags(cmd)
 			path, err := deps.configPath()
 			if err != nil {
 				return err
 			}
-			if err := app.LoanAdd(path, args[0], l); err != nil {
+			if err := app.LoanAdd(path, args[0], in); err != nil {
 				return err
 			}
 			// La salida es el préstamo guardado, tal cual quedó.
@@ -183,76 +161,17 @@ func newLoanEditCmd(deps Deps) *cobra.Command {
 		Short: "Cambia los campos indicados de un préstamo guardado",
 		Args:  exactArgs("loan edit", 1, "\"hipoteca loan list\" muestra los ids guardados"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Sólo se parsean las banderas: la validación de valores ocurre
+			// Sólo se traducen las banderas: la validación de valores ocurre
 			// sobre el préstamo ya fusionado en app.LoanEdit, que es el
 			// resultado real de la edición. Un valor presente inválido (mal
 			// enum, mes negativo) sigue fallando con usage/2 nombrando el
 			// campo, y no se escribe nada en la config.
-			cambios, err := prestamoDeFlags(cmd)
-			if err != nil {
-				return err
-			}
+			cambios := cambiosDeFlags(cmd)
 			path, err := deps.configPath()
 			if err != nil {
 				return err
 			}
-			err = app.LoanEdit(path, args[0], func(l *loan.Loan) {
-				if cmd.Flags().Changed("name") {
-					l.Name = cambios.Name
-				}
-				if cmd.Flags().Changed("type") {
-					l.Type = cambios.Type
-				}
-				if cmd.Flags().Changed("start-date") {
-					l.StartDate = cambios.StartDate
-				}
-				if cmd.Flags().Changed("principal") {
-					l.OriginalPrincipal = cambios.OriginalPrincipal
-				}
-				if cmd.Flags().Changed("months") {
-					l.TermMonths = cambios.TermMonths
-				}
-				if cmd.Flags().Changed("payment-day") {
-					l.PaymentDay = cambios.PaymentDay
-				}
-				if cmd.Flags().Changed("initial-rate") {
-					l.InitialRate = cambios.InitialRate
-				}
-				if cmd.Flags().Changed("initial-period-months") {
-					l.InitialPeriodMonths = cambios.InitialPeriodMonths
-				}
-				if cmd.Flags().Changed("index") {
-					l.Index = cambios.Index
-				}
-				if cmd.Flags().Changed("spread") {
-					l.Spread = cambios.Spread
-				}
-				if cmd.Flags().Changed("spread-unbonified") {
-					l.SpreadUnbonified = cambios.SpreadUnbonified
-				}
-				if cmd.Flags().Changed("revision-every-months") {
-					l.RevisionEveryMonths = cambios.RevisionEveryMonths
-				}
-				if cmd.Flags().Changed("reference-offset-months") {
-					l.ReferenceOffsetMonths = cambios.ReferenceOffsetMonths
-				}
-				if cmd.Flags().Changed("floor") {
-					l.FloorRate = cambios.FloorRate
-				}
-				if cmd.Flags().Changed("rate-rounding") {
-					l.RateRounding = cambios.RateRounding
-				}
-				if cmd.Flags().Changed("interest-convention") {
-					l.InterestConvention = cambios.InterestConvention
-				}
-				if cmd.Flags().Changed("payment-rounding") {
-					l.PaymentRounding = cambios.PaymentRounding
-				}
-				if cmd.Flags().Changed("fee-pct") {
-					l.EarlyRepaymentFeePct = cambios.EarlyRepaymentFeePct
-				}
-			})
-			if err != nil {
+			if err := app.LoanEdit(path, args[0], cambios); err != nil {
 				return err
 			}
 			res, err := app.LoanShow(path, args[0])
@@ -373,7 +292,7 @@ func newLoanSyncCmd(deps Deps) *cobra.Command {
 			dateValue, _ := flags.GetString("date")
 			outstandingValue, _ := flags.GetString("outstanding")
 			rateValue, _ := flags.GetString("rate")
-			s := loan.Sync{
+			s := app.LoanSyncInput{
 				Date:                 dateValue,
 				OutstandingPrincipal: outstandingValue,
 				CurrentRate:          rateValue,

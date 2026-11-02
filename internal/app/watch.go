@@ -2,14 +2,21 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aam9063/hipoteca-cli/internal/bde"
 	"github.com/aam9063/hipoteca-cli/internal/config"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/finance"
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 	"github.com/aam9063/hipoteca-cli/internal/model"
 	"github.com/aam9063/hipoteca-cli/internal/store"
 	"github.com/aam9063/hipoteca-cli/internal/watch"
@@ -236,7 +243,7 @@ func impactCalculator(cfg config.Config) watch.ImpactFor {
 			if l.Index != target {
 				continue
 			}
-			if len(l.MissingFields()) > 0 {
+			if len(loan.MissingFields(l)) > 0 {
 				warnings = append(warnings,
 					fmt.Sprintf("el préstamo %q está incompleto: no se estima su cambio de cuota (falta un dato de tu escritura, P-06)", id))
 				continue
@@ -344,4 +351,98 @@ func WatchRun(ctx context.Context, p RunParams) error {
 			return nil // el contexto se canceló: fin limpio, no es un fallo
 		}
 	}
+}
+
+// ----------------------------------------------------------------------------
+// El aviso como servicio del usuario (WATCH-01, REF-01): la CLI pide a app
+// la instalación, retirada y estado sin conocer internal/watch ni el gestor
+// de servicios del sistema. Las tres operaciones comparten la unidad, que
+// arma app con los datos del entorno actual.
+// ----------------------------------------------------------------------------
+
+// WatchKindIndex es el único tipo de vigilancia en v1, reexportado del
+// paquete de vigilancias (REF-01: la CLI no lo importa).
+const WatchKindIndex = watch.KindIndex
+
+// runSystemService ejecuta el gestor de servicios y devuelve su salida dentro
+// del error: cuando systemctl falla, el motivo útil está en su stderr.
+func runSystemService(name string, args ...string) error {
+	c := exec.Command(name, args...)
+	out, err := c.CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(out))
+		if detail == "" {
+			return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+		}
+		return fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, detail)
+	}
+	return nil
+}
+
+// serviceUnitOf arma la unidad del servicio con los datos del entorno actual
+// (la ruta de la base de datos, el propio binario, el home del usuario y el
+// sistema operativo).
+func serviceUnitOf(dataPath string, interval time.Duration) (watch.ServiceUnit, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return watch.ServiceUnit{}, errs.New(errs.KindInternal,
+			fmt.Sprintf("no se pudo averiguar la ruta del ejecutable: %v", err),
+			"el servicio necesita la ruta absoluta del binario; ejecútalo desde una ruta conocida")
+	}
+	if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
+		execPath = resolved
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return watch.ServiceUnit{}, errs.New(errs.KindInternal,
+			fmt.Sprintf("no se pudo determinar el directorio del usuario: %v", err), "")
+	}
+	unit, err := watch.ServiceUnitFor(runtime.GOOS, home, execPath, filepath.Dir(dataPath), interval)
+	if errors.Is(err, watch.ErrServiceUnsupported) {
+		return watch.ServiceUnit{}, errs.New(errs.KindUsage,
+			fmt.Sprintf("este sistema (%s) no tiene un servicio de usuario soportado", runtime.GOOS),
+			"en Windows ejecuta \"hipoteca watch run --interval 12h\" como tarea programada; install/uninstall sólo existen para systemd y launchd")
+	}
+	if err != nil {
+		return watch.ServiceUnit{}, err
+	}
+	return unit, nil
+}
+
+// WatchServiceInstall instala el aviso como servicio del usuario y lo activa.
+// S5 de WATCH-01: un servicio que no vigila nada es una trampa silenciosa,
+// así que sin vigilancias guardadas responde usage/2.
+func WatchServiceInstall(dataPath string, interval time.Duration) (watch.ServiceState, error) {
+	list, err := WatchList(dataPath)
+	if err != nil {
+		return watch.ServiceState{}, err
+	}
+	if len(list.Watches) == 0 {
+		return watch.ServiceState{}, errs.New(errs.KindUsage,
+			"no hay ninguna vigilancia que el servicio pueda atender",
+			"crea una antes con \"hipoteca watch add index euribor-1y --sink <nombre>\"")
+	}
+	unit, err := serviceUnitOf(dataPath, interval)
+	if err != nil {
+		return watch.ServiceState{}, err
+	}
+	return watch.ServiceInstall(unit, runSystemService)
+}
+
+// WatchServiceUninstall retira el servicio y no deja restos.
+func WatchServiceUninstall(dataPath string, interval time.Duration) (watch.ServiceState, error) {
+	unit, err := serviceUnitOf(dataPath, interval)
+	if err != nil {
+		return watch.ServiceState{}, err
+	}
+	return watch.ServiceUninstall(unit, runSystemService)
+}
+
+// WatchServiceStatus dice si el servicio está instalado.
+func WatchServiceStatus(dataPath string) (watch.ServiceState, error) {
+	unit, err := serviceUnitOf(dataPath, 12*time.Hour)
+	if err != nil {
+		return watch.ServiceState{}, err
+	}
+	return watch.ServiceStatusOf(unit)
 }

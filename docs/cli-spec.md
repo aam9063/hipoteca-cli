@@ -445,6 +445,34 @@ Uso: `hipoteca skills list [flags]`
 |---|---|---|---|
 | `--pretty` | `bool` | `false` | tabla legible para humanos: la receta a la izquierda y su descripción a la derecha |
 
+### `hipoteca uninstall`
+
+**Estado:** v0.1.0 (disponible).
+
+Borra tu config (préstamos incluidos), la base de datos y la caché; el binario no
+
+Borra los datos que hipoteca guarda en esta máquina:
+
+  la configuración (config.toml), con tus préstamos guardados
+  la base de datos (hipoteca.db), con las vigilancias y los meses vistos
+  la caché de series del Banco de España
+
+Sin --yes no se borra nada: responde confirmation_required y las rutas quedan
+intactas. Con --dry-run enumera las rutas y cuánto ocupa cada una, también
+sin borrar nada.
+
+El binario NO se borra: lo retira el gestor de paquetes que lo instaló
+("scoop uninstall hipoteca" con Scoop, "brew uninstall --cask hipoteca" con
+Homebrew) o bórralo tú del directorio donde lo tengas.
+
+Uso: `hipoteca uninstall [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--dry-run` | `bool` | `false` | enumera las rutas y su tamaño sin borrar nada |
+| `--list` | `bool` | `false` | igual que --dry-run |
+| `--yes` | `bool` | `false` | confirma el borrado: sin ella no se borra nada |
+
 ### `hipoteca update`
 
 **Estado:** v0.1.0 (disponible).

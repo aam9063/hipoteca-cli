@@ -314,3 +314,23 @@ func TestE2ERemoveIdOpcional(t *testing.T) {
 
 // assertSingleJSON ya está definido en index_test.go (mismo paquete): un
 // único valor JSON terminado en salto de línea.
+
+// loanInputDe convierte un préstamo en la entrada del CLI (REF-01): los
+// tests de cableado construían loan.Loan a mano; ahora la traducción vive en
+// app y aquí sólo se adapta.
+func loanInputDe(l loan.Loan) app.LoanInput {
+	str := func(v string) *string { return &v }
+	ent := func(v int) *int { return &v }
+	return app.LoanInput{
+		Name: str(l.Name), Type: str(l.Type), StartDate: str(l.StartDate),
+		OriginalPrincipal: str(l.OriginalPrincipal), TermMonths: ent(l.TermMonths),
+		PaymentDay: ent(l.PaymentDay), InitialRate: str(l.InitialRate),
+		InitialPeriodMonths: l.InitialPeriodMonths, Index: str(l.Index),
+		Spread: str(l.Spread), SpreadUnbonified: str(l.SpreadUnbonified),
+		RevisionEveryMonths:   ent(l.RevisionEveryMonths),
+		ReferenceOffsetMonths: l.ReferenceOffsetMonths,
+		FloorRate:             l.FloorRate, RateRounding: str(l.RateRounding),
+		InterestConvention: str(l.InterestConvention), PaymentRounding: str(l.PaymentRounding),
+		EarlyRepaymentFeePct: str(l.EarlyRepaymentFeePct),
+	}
+}

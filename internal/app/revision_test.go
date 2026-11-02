@@ -344,3 +344,41 @@ func TestRevisionIdOpcional(t *testing.T) {
 		t.Fatalf("loan = %q, want casa", res.Loan)
 	}
 }
+
+// TestRevisionCalculaSinComision (REF-04, S9): la comisión de amortización no
+// interviene en una revisión, así que su ausencia no impide calcular. El
+// resto de la salida no cambia respecto a la revisión con comisión 0.
+func TestRevisionCalculaSinComision(t *testing.T) {
+	sinFee := prestamoRevision()
+	sinFee.EarlyRepaymentFeePct = ""
+	path := configCon(t, map[string]loan.Loan{"casa": sinFee})
+	rt := runtimeRevision(t)
+
+	conFee := prestamoRevision()
+	conFee.EarlyRepaymentFeePct = "0"
+	pathConFee := configCon(t, map[string]loan.Loan{"casa": conFee})
+
+	res, err := Revision(t.Context(), rt, RevisionParams{
+		ConfigPath: path,
+		LoanID:     "casa",
+		Date:       "2026-11",
+		Now:        ahoraFijo(),
+	})
+	if err != nil {
+		t.Fatalf("Revision() sin comisión: %v, want el cálculo (REF-04)", err)
+	}
+	esperada, err := Revision(t.Context(), rt, RevisionParams{
+		ConfigPath: pathConFee,
+		LoanID:     "casa",
+		Date:       "2026-11",
+		Now:        ahoraFijo(),
+	})
+	if err != nil {
+		t.Fatalf("Revision() con comisión 0: %v", err)
+	}
+	if res.Payment.New.String() != esperada.Payment.New.String() ||
+		res.Rate.New.String() != esperada.Rate.New.String() {
+		t.Fatalf("la revisión sin comisión difiere de la de comisión 0:\n%s vs %s",
+			res.Payment.New.String(), esperada.Payment.New.String())
+	}
+}
