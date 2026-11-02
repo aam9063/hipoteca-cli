@@ -39,14 +39,21 @@ type skillsListOutput struct {
 
 // newSkillsListCmd: las recetas disponibles con su id y su resumen.
 func newSkillsListCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Las recetas disponibles, con su id y una línea de para qué sirven",
 		Args:  noArgs("skills list"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			list := skills.List()
+			// --pretty es la vista para humanos; el JSON sigue siendo el
+			// defecto porque es el contrato que consumen los agentes.
+			if pretty, _ := cmd.Flags().GetBool("pretty"); pretty {
+				_, err := fmt.Fprint(cmd.OutOrStdout(), renderSkillsTable(list))
+				return err
+			}
 			out := skillsListOutput{
 				SchemaVersion: model.SchemaVersion,
-				Skills:        skills.List(),
+				Skills:        list,
 			}
 			if err := output.WriteJSON(cmd.OutOrStdout(), out); err != nil {
 				return fmt.Errorf("escribiendo el resultado: %w", err)
@@ -54,6 +61,10 @@ func newSkillsListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	// Sin --pretty el JSON no cambia: es el contrato que consumen los agentes
+	// y los tests, y no debe depender de dónde se ejecute el comando (D-01).
+	cmd.Flags().Bool("pretty", false, "tabla legible para humanos: la receta a la izquierda y su descripción a la derecha")
+	return cmd
 }
 
 // newSkillsGetCmd: la receta completa en texto plano (S2). Es LA excepción
