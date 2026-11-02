@@ -5,6 +5,8 @@
 
 # hipoteca-cli
 
+![demo](assets/demo.gif)
+
 Spanish mortgage maths on the terminal: official Banco de España indices, rate revisions,
 amortization schedules, early repayment and index comparison. Exact decimals, JSON for
 agents, tables for people, and no financial advice — by design.
