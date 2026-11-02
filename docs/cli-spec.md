@@ -473,9 +473,13 @@ Uso: `hipoteca update [flags]`
 
 **Estado:** v0.1.0 (disponible).
 
-Muestra la versión, el commit y la fecha de compilación
+Muestra la versión
 
-Uso: `hipoteca version`
+Uso: `hipoteca version [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--json` | `bool` | `false` | el contrato completo: versión, commit y fecha de compilación |
 
 ### `hipoteca watch`
 
