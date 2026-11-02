@@ -64,6 +64,42 @@ hipoteca amortize --principal 150000 --rate 3.10 --months 300 \
 - **Made for scripts and AI agents:** JSON by default, stable exit codes, machine-readable
   errors, and the usage guide built into the binary (`hipoteca skills list`).
 
+## Why it exists
+
+Finding out what your mortgage will cost you next month means opening three things and
+trusting none of them.
+
+Your escritura says the rate is Euríbor plus a spread, revised every twelve months, with a
+floor and a rounding rule. The index is not in the escritura: the Banco de España publishes
+it, so you go looking for it, hoping the site you land on has the month your contract actually
+uses. Then you need a calculator, and the ones that exist are bank websites selling you a
+refinance, a spreadsheet you updated once and no longer remember, or a formula from a forum
+that may or may not round the interest before amortising.
+
+None of them tells you where the number came from. Two of them disagree by a few cents and
+neither explains why.
+
+And the question you actually want to ask — *how much does my payment go up in January?* — you
+cannot ask an AI agent either. It does not have your escritura, it cannot read the Banco de
+España site reliably, and given half a chance it will invent a Euríbor value rather than admit
+it does not know the latest one.
+
+**hipoteca-cli puts the three pieces in one binary**: the official indices, your loan, and the
+arithmetic that connects them. You ask your agent, it runs one command, and it answers with
+your numbers — saying which index, which month and which spread it used. No bank calculator,
+no spreadsheet, nothing to reconcile by hand.
+
+That only works if the arithmetic is exact and the data is real, so the tool also does three
+things a calculator does not:
+
+1. **It refuses to guess.** No escritura data, no answer: `loan_incomplete` names the missing
+   field. An index month the Banco has not published is `index_not_published`, never an
+   invented value.
+2. **It shows its work.** Every result carries its inputs, the formula applied, and the exact
+   Banco attribution with the data update date.
+3. **It never recommends.** Zero sentences telling you what to do with your money. A bank's
+   calculator has an incentive; this one has none.
+
 ## Install
 
 ```bash
