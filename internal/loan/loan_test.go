@@ -49,10 +49,10 @@ func TestPrestamoCompletoValida(t *testing.T) {
 		"con suelo":           conSuelo,
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := l.Validate(); err != nil {
+			if err := Validate(l); err != nil {
 				t.Fatalf("Validate() del préstamo completo: error = %v", err)
 			}
-			if missing := l.MissingFields(); len(missing) != 0 {
+			if missing := MissingFields(l); len(missing) != 0 {
 				t.Fatalf("MissingFields() = %v, want vacío", missing)
 			}
 		})
@@ -90,7 +90,7 @@ func TestCampoObligatorioAusente(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			l := completa()
 			tc.rozar(&l)
-			err := l.Validate()
+			err := Validate(l)
 			var inc *IncompleteError
 			if !errors.As(err, &inc) {
 				t.Fatalf("Validate() = %v, want IncompleteError", err)
@@ -103,7 +103,7 @@ func TestCampoObligatorioAusente(t *testing.T) {
 			}
 			// El campo también aparece en MissingFields, que es lo que
 			// muestra `loan show` (arranque §4.1: show avisa si faltan).
-			missing := l.MissingFields()
+			missing := MissingFields(l)
 			if len(missing) != 1 || missing[0] != tc.campo {
 				t.Fatalf("MissingFields() = %v, want [%s]", missing, tc.campo)
 			}
@@ -128,7 +128,7 @@ func TestSyncIncompleto(t *testing.T) {
 			l := completa()
 			l.Sync = &Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
 			tc.rozar(l.Sync)
-			err := l.Validate()
+			err := Validate(l)
 			var inc *IncompleteError
 			if !errors.As(err, &inc) || inc.Field != tc.campo {
 				t.Fatalf("Validate() = %v, want IncompleteError con campo %q", err, tc.campo)
@@ -141,7 +141,7 @@ func TestSyncIncompleto(t *testing.T) {
 func TestSyncCompletoValida(t *testing.T) {
 	l := completa()
 	l.Sync = &Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
-	if err := l.Validate(); err != nil {
+	if err := Validate(l); err != nil {
 		t.Fatalf("Validate() con sync completo: error = %v", err)
 	}
 }
@@ -195,7 +195,7 @@ func TestValoresInvalidos(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			l := completa()
 			tc.rozar(&l)
-			err := l.Validate()
+			err := Validate(l)
 			var e *errs.Error
 			if !errors.As(err, &e) {
 				t.Fatalf("Validate() = %v (%T), want error de uso del contrato", err, err)
@@ -217,8 +217,44 @@ func TestRateRoundingsSoportados(t *testing.T) {
 	for _, r := range []string{"none", "1/8", "1/4", "0.05"} {
 		l := completa()
 		l.RateRounding = r
-		if err := l.Validate(); err != nil {
+		if err := Validate(l); err != nil {
 			t.Fatalf("Validate() con rate_rounding %q: error = %v", r, err)
 		}
+	}
+}
+
+// TestValidateWithoutFeeRelajaSoloLaComision (REF-04, S9-S11): la comisión de
+// amortización no hace falta para revision ni schedule, así que su ausencia
+// no impide validar para esos comandos. El resto de campos obligatorios sigue
+// siendo obligatorio, Validate() sigue exigiéndola (amortize la usa) y nada
+// se rellena con un valor por defecto.
+func TestValidateWithoutFeeRelajaSoloLaComision(t *testing.T) {
+	sinFee := completa()
+	sinFee.EarlyRepaymentFeePct = ""
+
+	// ValidateWithoutFee calcula aunque falte la comisión.
+	if err := ValidateWithoutFee(sinFee); err != nil {
+		t.Fatalf("ValidateWithoutFee() sin comisión: error = %v, want nil", err)
+	}
+	// Validate() sigue exigiéndola: amortize la necesita.
+	err := Validate(sinFee)
+	var inc *IncompleteError
+	if !errors.As(err, &inc) || inc.Field != "early_repayment_fee_pct" {
+		t.Fatalf("Validate() sin comisión = %v, want IncompleteError early_repayment_fee_pct", err)
+	}
+	// MissingFields sigue avisando de que el dato falta (show lo muestra).
+	missing := MissingFields(sinFee)
+	if len(missing) != 1 || missing[0] != "early_repayment_fee_pct" {
+		t.Fatalf("MissingFields() = %v, want [early_repayment_fee_pct]", missing)
+	}
+
+	// Un préstamo incompleto por otro campo sigue sin validar para
+	// revision/schedule: la relajación es sólo de la comisión.
+	sinSuelo := completa()
+	sinSuelo.EarlyRepaymentFeePct = ""
+	sinSuelo.FloorRate = nil
+	err = ValidateWithoutFee(sinSuelo)
+	if !errors.As(err, &inc) || inc.Field != "floor_rate" {
+		t.Fatalf("ValidateWithoutFee() sin suelo = %v, want IncompleteError floor_rate", err)
 	}
 }

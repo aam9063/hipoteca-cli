@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aam9063/hipoteca-cli/internal/config"
 	"github.com/aam9063/hipoteca-cli/internal/errs"
 	"github.com/aam9063/hipoteca-cli/internal/finance"
 	"github.com/aam9063/hipoteca-cli/internal/model"
@@ -33,91 +34,32 @@ type IncompleteError struct {
 	Field string
 }
 
+// FieldEarlyRepaymentFeePct es el nombre exacto del campo de la comisión de
+// amortización anticipada en la config (REF-04): es el único obligatorio sólo
+// para los comandos que lo usan (amortize), no para guardar ni para revision
+// y schedule.
+const FieldEarlyRepaymentFeePct = "early_repayment_fee_pct"
+
 // Error implementa error.
 func (e *IncompleteError) Error() string {
 	return fmt.Sprintf("el préstamo no está completo: falta %s", e.Field)
 }
 
-// Sync es la resincronización con el recibo real del banco (opcional;
-// docs/ARRANQUE.md §4.1). Cuando está presente, el capital pendiente y el
-// tipo de partida son los del recibo, no los calculados (decisión 2 de
-// LOAN-01), así que sus tres campos son obligatorios juntos.
-type Sync struct {
-	// Date es la fecha del recibo, YYYY-MM-DD.
-	Date string `toml:"date" json:"date"`
-	// OutstandingPrincipal es el capital pendiente según el recibo, en euros,
-	// como decimal exacto ("152341.18").
-	OutstandingPrincipal string `toml:"outstanding_principal" json:"outstanding_principal"`
-	// CurrentRate es el TIN vigente según el recibo, en tanto por ciento
-	// ("3.12").
-	CurrentRate string `toml:"current_rate" json:"current_rate"`
-}
-
-// Loan es un préstamo guardado en la config local ([loans.<id>],
-// docs/ARRANQUE.md §4.1). Los importes y los tipos son cadenas decimales
-// exactas — el formato TOML del arranque conserva la escala que escribió el
-// usuario ("180000.00" sigue siendo "180000.00")— y la validación las parsea
-// con model.NewDecimal: nunca hay float64 y el valor que viaja a
-// internal/finance es un shopspring decimal exacto.
-//
-// Los campos que dependen de la escritura son obligatorios o explícitos
-// (decisión 1): ReferenceOffsetMonths y FloorRate van con puntero porque el
-// cero y la cadena vacía son valores legítimos (offset 0 y "sin suelo"), de
-// modo que su ausencia en el TOML (puntero nil) es lo que marca el préstamo
-// como incompleto. FloorRate vacío no es un suelo inventado: es la ausencia
-// de suelo declarada.
-type Loan struct {
-	// Name es el nombre con el que el usuario reconoce el préstamo.
-	Name string `toml:"name" json:"name"`
-	// Type es variable, mixta o fija (§4.1).
-	Type string `toml:"type" json:"type"`
-	// StartDate es la fecha de la primera cuota o de firma, según escritura,
-	// YYYY-MM-DD.
-	StartDate string `toml:"start_date" json:"start_date"`
-	// OriginalPrincipal es el capital original en euros ("180000.00").
-	OriginalPrincipal string `toml:"original_principal" json:"original_principal"`
-	// TermMonths es el plazo total en meses.
-	TermMonths int `toml:"term_months" json:"term_months"`
-	// PaymentDay es el día del mes en que se paga la cuota (1..31).
-	PaymentDay int `toml:"payment_day" json:"payment_day"`
-	// InitialRate es el TIN anual % del periodo inicial ("1.25").
-	InitialRate string `toml:"initial_rate" json:"initial_rate"`
-	// InitialPeriodMonths son los meses a tipo fijo antes de la primera
-	// revisión; 0 es un valor legítimo y por eso va con puntero.
-	InitialPeriodMonths *int `toml:"initial_period_months" json:"initial_period_months"`
-	// Index es el id del índice del catálogo ("euribor-1y").
-	Index string `toml:"index" json:"index"`
-	// Spread es el diferencial en puntos ("0.89").
-	Spread string `toml:"spread" json:"spread"`
-	// SpreadUnbonified es el diferencial sin bonificaciones; opcional.
-	SpreadUnbonified string `toml:"spread_unbonified,omitempty" json:"spread_unbonified,omitempty"`
-	// RevisionEveryMonths es la frecuencia de revisión en meses.
-	RevisionEveryMonths int `toml:"revision_every_months" json:"revision_every_months"`
-	// ReferenceOffsetMonths es qué mes de índice se usa: N meses antes del mes
-	// de revisión, según escritura; 0 es legítimo y por eso va con puntero.
-	ReferenceOffsetMonths *int `toml:"reference_offset_months" json:"reference_offset_months"`
-	// FloorRate es el suelo del tipo ("2.00") o "" para sin suelo; su ausencia
-	// (nil) deja el préstamo incompleto.
-	FloorRate *string `toml:"floor_rate" json:"floor_rate"`
-	// RateRounding es el redondeo de escritura del tipo: none, 1/8, 1/4 o 0.05.
-	RateRounding string `toml:"rate_rounding" json:"rate_rounding"`
-	// InterestConvention es la convención de interés; hoy sólo
-	// monthly-nominal (TIN/12 por mes).
-	InterestConvention string `toml:"interest_convention" json:"interest_convention"`
-	// PaymentRounding es el redondeo de la cuota; hoy sólo half-up-cents.
-	PaymentRounding string `toml:"payment_rounding" json:"payment_rounding"`
-	// EarlyRepaymentFeePct es la comisión de amortización anticipada en
-	// tanto por ciento del importe según escritura ("0" si no la hay).
-	EarlyRepaymentFeePct string `toml:"early_repayment_fee_pct" json:"early_repayment_fee_pct"`
-	// Sync es la última sincronización con el recibo; opcional.
-	Sync *Sync `toml:"sync,omitempty" json:"sync,omitempty"`
-}
+// Sync y Loan son los tipos del esquema de la config ([loans.<id>], REF-02):
+// la forma del fichero vive en internal/config, que es quien lo escribe y lo
+// carga, y aquí llegan vía alias para que el resto del programa —y sobre todo
+// las reglas de validez que aplica este paquete— siga hablando de loan.Loan.
+// Con el alias, estas funciones son las válidas del tipo del contrato.
+type (
+	Loan = config.Loan
+	Sync = config.Sync
+)
 
 // MissingFields devuelve los nombres de todos los campos obligatorios que el
 // préstamo no declara, en el orden del modelo. Es lo que `loan show` lista
 // para avisar (arranque §4.1) y lo que Validate usa para el centinela.
 // Sólo mira presencia: los valores presentes se validan en ValidateValues.
-func (l Loan) MissingFields() []string {
+func MissingFields(l Loan) []string {
 	var missing []string
 	add := func(campo string, vacio bool) {
 		if vacio {
@@ -154,18 +96,35 @@ func (l Loan) MissingFields() []string {
 // *IncompleteError nombrándolo— y después los valores de los presentes. Un
 // valor presente pero imposible es un error de uso del contrato (código 2),
 // nunca un error interno.
-func (l Loan) Validate() error {
-	if missing := l.MissingFields(); len(missing) > 0 {
+func Validate(l Loan) error {
+	if missing := MissingFields(l); len(missing) > 0 {
 		return &IncompleteError{Field: missing[0]}
 	}
-	return l.ValidateValues()
+	return ValidateValues(l)
+}
+
+// ValidateWithoutFee valida el préstamo para los comandos que NO usan la
+// comisión de amortización — revision y schedule (REF-04, S9)—: igual que
+// Validate, pero early_repayment_fee_pct puede faltar. La regla «nada se
+// supone» no se relaja (S11): el campo no se rellena con ningún valor por
+// defecto, simplemente no se exige donde no hace falta; amortize sigue
+// validando con Validate, que sí la exige (S10).
+func ValidateWithoutFee(l Loan) error {
+	if missing := MissingFields(l); len(missing) > 0 {
+		// early_repayment_fee_pct es el único campo que ValidateWithoutFee
+		// tolera ausente: si es el único que falta, hay cálculo.
+		if len(missing) > 1 || missing[0] != FieldEarlyRepaymentFeePct {
+			return &IncompleteError{Field: missing[0]}
+		}
+	}
+	return ValidateValues(l)
 }
 
 // ValidateValues valida sólo los valores de los campos presentes: decimales
 // bien formados, rangos y enumerados. No mira presencia, de modo que un
 // préstamo a medias (que `loan add` permite guardar) puede validarse por
 // partes a medida que el usuario completa datos.
-func (l Loan) ValidateValues() error {
+func ValidateValues(l Loan) error {
 	usage := func(format string, args ...any) error {
 		return errs.New(errs.KindUsage, fmt.Sprintf(format, args...),
 			"revisa el valor del campo en la config o con \"hipoteca loan edit\"")

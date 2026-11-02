@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/aam9063/hipoteca-cli/internal/loan"
 )
 
 // writeBytes writes b to a new file under dir and returns its path.
@@ -163,18 +161,18 @@ func TestSaveRejectsUnsupportedSchemaVersion(t *testing.T) {
 
 // ----------------------------------------------------------------------------
 // Sección [loans.<id>] (LOAN-01.2): la misma escritura atómica de CORE-02,
-// con el modelo de internal/loan.
+// con el esquema del préstamo que este paquete define (Loan, arriba).
 // ----------------------------------------------------------------------------
 
 // prestamoCasa devuelve el préstamo del ejemplo de docs/ARRANQUE.md §4.1,
 // completo, para las pruebas de ida y vuelta.
-func prestamoCasa() loan.Loan {
+func prestamoCasa() Loan {
 	initialPeriod := 12
 	offset := 2
 	sinSuelo := ""
-	return loan.Loan{
+	return Loan{
 		Name:                  "Casa",
-		Type:                  loan.TypeVariable,
+		Type:                  "variable",
 		StartDate:             "2021-06-01",
 		OriginalPrincipal:     "180000.00",
 		TermMonths:            360,
@@ -188,14 +186,14 @@ func prestamoCasa() loan.Loan {
 		ReferenceOffsetMonths: &offset,
 		FloorRate:             &sinSuelo,
 		RateRounding:          "none",
-		InterestConvention:    loan.InterestConventionMonthlyNominal,
-		PaymentRounding:       loan.PaymentRoundingHalfUpCents,
+		InterestConvention:    "monthly-nominal",
+		PaymentRounding:       "half-up-cents",
 		EarlyRepaymentFeePct:  "0",
 	}
 }
 
 // equalLoans compara dos préstamos campo a campo, incluidos los punteros.
-func equalLoans(t *testing.T, want, got loan.Loan) {
+func equalLoans(t *testing.T, want, got Loan) {
 	t.Helper()
 	if !reflect.DeepEqual(want, got) {
 		t.Fatalf("el préstamo cambió en la ida y vuelta:\nwant %+v\ngot  %+v", want, got)
@@ -254,7 +252,7 @@ current_rate = "3.12"
 		t.Fatalf("no está el préstamo casa: %v", got.Loans)
 	}
 	want := prestamoCasa()
-	want.Sync = &loan.Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+	want.Sync = &Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
 	equalLoans(t, want, l)
 }
 
@@ -264,13 +262,13 @@ current_rate = "3.12"
 func TestSaveLoadRoundTripLoans(t *testing.T) {
 	offsetCero := 0
 	tramoCero := 0
-	for name, l := range map[string]loan.Loan{
-		"completo con sync": func() loan.Loan {
+	for name, l := range map[string]Loan{
+		"completo con sync": func() Loan {
 			l := prestamoCasa()
-			l.Sync = &loan.Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
+			l.Sync = &Sync{Date: "2026-10-01", OutstandingPrincipal: "152341.18", CurrentRate: "3.12"}
 			return l
 		}(),
-		"offset cero y sin suelo": func() loan.Loan {
+		"offset cero y sin suelo": func() Loan {
 			l := prestamoCasa()
 			l.ReferenceOffsetMonths = &offsetCero
 			l.InitialPeriodMonths = &tramoCero
@@ -281,7 +279,7 @@ func TestSaveLoadRoundTripLoans(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.toml")
 			cfg := Default()
-			cfg.Loans = map[string]loan.Loan{"casa": l}
+			cfg.Loans = map[string]Loan{"casa": l}
 			if err := cfg.Save(path); err != nil {
 				t.Fatalf("Save() error = %v", err)
 			}

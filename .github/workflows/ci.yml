@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+  # REF-06 (S8): el job que instala desde el manifiesto publicado se lanza a
+  # mano, sin necesitar un tag nuevo.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -48,6 +51,35 @@ jobs:
         run: bash scripts/check-review-report.sh
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+
+  # REF-06 (S6/S7): verifica lo que el consumidor recibe, no lo que
+  # producimos. Scoop instala el paquete del bucket publicado — descarga la
+  # URL del manifiesto y comprueba su SHA256, así que una URL muerta o un
+  # hash que no cuadre dejan el job en rojo — y el binario instalado responde
+  # `version` con el contrato. Se lanza a mano (workflow_dispatch, S8): el
+  # manifiesto apunta a la última release, no al código de este commit.
+  scoop-install:
+    name: scoop install from the published bucket
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add the bucket and install the package
+        shell: pwsh
+        run: |
+          scoop bucket add aam9063 https://github.com/aam9063/scoop-bucket
+          scoop install hipoteca
+
+      - name: The installed binary answers version
+        shell: pwsh
+        run: |
+          $out = hipoteca version
+          Write-Host $out
+          $json = $out | ConvertFrom-Json
+          if (-not $json.schema_version -or -not $json.version) {
+            throw "el binario instalado no responde version con el contrato: $out"
+          }
 
   release-check:
     name: release file and installer

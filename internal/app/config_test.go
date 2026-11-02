@@ -102,7 +102,7 @@ func TestConfigSetRejectsInvalidSinkURLBeforeWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, url := range []string{"notaurl", "ftp://ntfy.sh/x", "https:///sin-host"} {
-		_, err := ConfigSet(path, nil, "sinks.ntfy.url", url)
+		_, err := ConfigSet(path, "sinks.ntfy.url", url, nil)
 		if !isErrsKind(err, errs.KindUsage) {
 			t.Errorf("la URL %q debe ser rechazada como usage, got %v", url, err)
 		}
@@ -119,7 +119,7 @@ func TestConfigSetRejectsInvalidSinkURLBeforeWriting(t *testing.T) {
 // AGENT-01 S6: `config set` de un tipo distinto de webhook se rechaza.
 func TestConfigSetRejectsUnknownSinkType(t *testing.T) {
 	path, _ := configConSink(t)
-	if _, err := ConfigSet(path, nil, "sinks.ntfy.type", "email"); !isErrsKind(err, errs.KindUsage) {
+	if _, err := ConfigSet(path, "sinks.ntfy.type", "email", nil); !isErrsKind(err, errs.KindUsage) {
 		t.Errorf("el tipo email debe rechazarse como usage, got %v", err)
 	}
 }
@@ -129,7 +129,7 @@ func TestConfigSetRejectsUnknownSinkType(t *testing.T) {
 func TestConfigSetWritesNewSinkAtomically(t *testing.T) {
 	path, _ := configConSink(t)
 	url := "https://token456@ntfy.sh/otro-topic"
-	res, err := ConfigSet(path, nil, "sinks.casa.url", url)
+	res, err := ConfigSet(path, "sinks.casa.url", url, nil)
 	if err != nil {
 		t.Fatalf("ConfigSet no debe fallar, got %v", err)
 	}
@@ -157,14 +157,14 @@ func TestConfigSetWritesNewSinkAtomically(t *testing.T) {
 // AGENT-01 S6: un override de índice sólo vale para un id del catálogo.
 func TestConfigSetIndicesRequiresCatalogID(t *testing.T) {
 	path, _ := configConSink(t)
-	if _, err := ConfigSet(path, nil, "indices.nadie", "CODIGO"); !isErrsKind(err, errs.KindNotFound) {
+	if _, err := ConfigSet(path, "indices.nadie", "CODIGO", nil); !isErrsKind(err, errs.KindNotFound) {
 		t.Errorf("un id fuera del catálogo debe ser not_found, got %v", err)
 	}
 	catalog, err := bde.LoadCatalog(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := ConfigSet(path, catalog, "indices.euribor-1y", "CODIGO_NUEVO")
+	res, err := ConfigSet(path, "indices.euribor-1y", "CODIGO_NUEVO", catalogRuntime(catalog))
 	if err != nil {
 		t.Fatalf("ConfigSet de un id del catálogo no debe fallar, got %v", err)
 	}
@@ -184,7 +184,7 @@ func TestConfigSetIndicesRequiresCatalogID(t *testing.T) {
 // `loan add`/`loan edit`.
 func TestConfigSetRejectsLoanKeys(t *testing.T) {
 	path, _ := configConSink(t)
-	if _, err := ConfigSet(path, nil, "loans.casa.spread", "0.90"); !isErrsKind(err, errs.KindUsage) {
+	if _, err := ConfigSet(path, "loans.casa.spread", "0.90", nil); !isErrsKind(err, errs.KindUsage) {
 		t.Errorf("las claves de préstamo deben rechazarse con el hint de loan edit, got %v", err)
 	}
 }
@@ -217,4 +217,12 @@ func isErrsKind(err error, kind errs.Kind) bool {
 		return false
 	}
 	return e.Kind == kind
+}
+
+// catalogRuntime es el resolvedor de runtime que los tests pasan a ConfigSet
+// (REF-01: la firma toma una función, no el catálogo).
+func catalogRuntime(catalog *bde.Catalog) func() (*Runtime, error) {
+	return func() (*Runtime, error) {
+		return &Runtime{Catalog: catalog}, nil
+	}
 }

@@ -96,11 +96,26 @@ func ConfigGet(path, key string) (ConfigValueResult, error) {
 //
 // Las claves admitidas son las mismas de `config get`. Los préstamos NO se
 // tocan desde aquí: su camino es `loan add`/`loan edit` (el hint lo dice).
-func ConfigSet(path string, catalog *bde.Catalog, key, value string) (ConfigValueResult, error) {
+//
+// El runtime llega como resolvedor (REF-01: la CLI no conoce el catálogo):
+// sólo se resuelve cuando la clave es un override de índices, de modo que
+// declarar un sink no necesita catálogo ni toca nada más.
+func ConfigSet(path, key, value string, runtime func() (*Runtime, error)) (ConfigValueResult, error) {
 	if value == "" {
 		return ConfigValueResult{}, errs.New(errs.KindUsage,
 			"falta el valor: indícalo tras la clave",
 			"ejemplo: hipoteca config set sinks.ntfy.url https://ntfy.sh/mi-topic")
+	}
+	var catalog *bde.Catalog
+	// Un resolvedor nil es "sin catálogo": validate responde not_found con
+	// el mismo mensaje que cuando no había catálogo (comportamiento de
+	// AGENT-01 preservado).
+	if strings.HasPrefix(key, "indices.") && runtime != nil {
+		rt, err := runtime()
+		if err != nil {
+			return ConfigValueResult{}, err
+		}
+		catalog = rt.Catalog
 	}
 	if err := validate(key, value, catalog); err != nil {
 		return ConfigValueResult{}, err

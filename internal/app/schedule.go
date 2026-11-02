@@ -73,7 +73,10 @@ func Schedule(p ScheduleParams) (ScheduleResult, error) {
 		return ScheduleResult{}, err
 	}
 	l := cfg.Loans[id]
-	if err := l.Validate(); err != nil {
+	// REF-04 (S9): la comisión de amortización no interviene en el cuadro,
+	// así que su ausencia no impide calcular (ValidateWithoutFee). Los demás
+	// datos de la escritura siguen siendo obligatorios (S11).
+	if err := loan.ValidateWithoutFee(l); err != nil {
 		return ScheduleResult{}, loanError(id, err)
 	}
 

@@ -94,7 +94,7 @@ func TestE2ECompareComparaSinRecomendar(t *testing.T) {
 			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
 			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
 		}
-		if err := app.LoanAdd(path, "casa", l); err != nil {
+		if err := app.LoanAdd(path, "casa", loanInputDe(l)); err != nil {
 			t.Fatalf("setup: loan add: %v", err)
 		}
 	})
@@ -157,7 +157,7 @@ func TestE2ECompareFijaEsHipotesis(t *testing.T) {
 			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
 			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
 		}
-		if err := app.LoanAdd(path, "casa", l); err != nil {
+		if err := app.LoanAdd(path, "casa", loanInputDe(l)); err != nil {
 			t.Fatalf("setup: loan add: %v", err)
 		}
 	})
@@ -220,7 +220,7 @@ func TestE2ECompareFlagIncorrecta(t *testing.T) {
 			RateRounding: "none", InterestConvention: loan.InterestConventionMonthlyNominal,
 			PaymentRounding: loan.PaymentRoundingHalfUpCents, EarlyRepaymentFeePct: "0",
 		}
-		if err := app.LoanAdd(path, "casa", l); err != nil {
+		if err := app.LoanAdd(path, "casa", loanInputDe(l)); err != nil {
 			t.Fatalf("setup: loan add: %v", err)
 		}
 	})

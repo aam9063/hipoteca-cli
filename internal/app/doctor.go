@@ -12,6 +12,7 @@ import (
 
 	"github.com/aam9063/hipoteca-cli/internal/bde"
 	"github.com/aam9063/hipoteca-cli/internal/config"
+	"github.com/aam9063/hipoteca-cli/internal/loan"
 	"github.com/aam9063/hipoteca-cli/internal/model"
 )
 
@@ -123,7 +124,7 @@ func Doctor(ctx context.Context, p DoctorParams) (DoctorResult, error) {
 		res.Loans = make([]DoctorLoan, 0, len(ids))
 		for _, id := range ids {
 			l := cfg.Loans[id]
-			missing := l.MissingFields()
+			missing := loan.MissingFields(l)
 			res.Loans = append(res.Loans, DoctorLoan{
 				ID:            id,
 				Name:          l.Name,
