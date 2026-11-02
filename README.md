@@ -114,7 +114,8 @@ published · `5` upstream unavailable · `6` network · `7` the API changed.
 The binary documents itself, so an agent does not have to guess a flag or read this file:
 
 ```bash
-hipoteca skills list          # four recipes: id and one-line purpose
+hipoteca skills list          # four recipes as JSON
+hipoteca skills list --pretty # the same, as a table for humans
 hipoteca skills get next-revision  # exact commands, flags, and what to do on each error
 hipoteca schema calc          # the output contract, generated from the binary
 hipoteca doctor               # version, paths, indices, saved loans and their missing fields

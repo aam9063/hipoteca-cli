@@ -428,7 +428,11 @@ Uso: `hipoteca skills get <id>`
 
 Las recetas disponibles, con su id y una línea de para qué sirven
 
-Uso: `hipoteca skills list`
+Uso: `hipoteca skills list [flags]`
+
+| Bandera | Tipo | Valor por defecto | Descripción |
+|---|---|---|---|
+| `--pretty` | `bool` | `false` | tabla legible para humanos: la receta a la izquierda y su descripción a la derecha |
 
 ### `hipoteca update`
 
