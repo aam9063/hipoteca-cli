@@ -1,0 +1,119 @@
+# QA-01 · Pase de arquitectura final
+
+## Qué se revisó
+
+Todo el árbol de `internal/`, las dependencias entre paquetes, los tamaños por archivo, y las
+reglas duras del arranque. No el estilo del código: **la forma**.
+
+Método: mapa de imports entre paquetes (generado, no de memoria), conteo de líneas por archivo,
+y lectura dirigida de los puntos que el mapa señaló.
+
+## Lo que está bien, y conviene decirlo
+
+- **`finance` no importa nada del proyecto.** Cero dependencias: es el kernel puro que el
+  arranque pedía, y sigue siéndolo después de diecinueve tareas.
+- **`model`, `errs` y `skills` tampoco.** Tres paquetes hoja que no arrastran nada.
+- **Solo `bde` hace HTTP.** La regla se sostiene; `watch` y `app` dependen de `bde` para el
+  acceso, no lo reimplementan.
+- **`store` y `update` son hojas casi puras** (`errs` y poco más), que es lo que se quiere de
+  la persistencia y de la auto-actualización.
+- Ningún paquete importa a `cli` ni a `app`: la dirección de dependencias nunca se invierte
+  hacia arriba.
+
+## Hallazgos
+
+### REF-01 · La CLI se salta `app` en cuatro sitios — **mayor**
+
+`internal/cli` importa `internal/bde`, `internal/loan` e `internal/watch` directamente, en
+`config.go`, `index.go`, `loan.go` y `watch.go`.
+
+La capa de presentación está hablando con el dominio y con la infraestructura. Hoy funciona
+porque las funciones son puras y pequeñas, pero significa que **la interfaz y los cálculos
+comparten dependencias**: cambiar cómo se lee un préstamo puede obligar a tocar la CLI, y
+testear la segunda arrastra la primera.
+
+`app` existe precisamente para eso; cuatro archivos lo están rodeando.
+
+### REF-02 · `config` depende de `loan` — **mayor**
+
+`internal/config/config.go:10` importa `internal/loan`.
+
+La configuración es infraestructura y no debería conocer el modelo de dominio. Está así porque
+la config **valida** préstamos al leerlos, lo cual es correcto como comportamiento pero está en
+el sitio equivocado: la validación pertenece a `loan` o a `app`, no al cargador de ficheros.
+
+Consecuencia práctica: `config` no se puede reutilizar sin arrastrar las reglas de negocio del
+préstamo.
+
+### REF-03 · No hay forma de borrar tus datos — **mayor**
+
+No existe comando de desinstalación ni de borrado de datos. `hipoteca` guarda dos cosas que
+importan:
+
+```
+config: %APPDATA%\hipoteca-cli\config.toml     ← préstamos: capital, tipo, fechas, diferencial
+datos:  %LOCALAPPDATA%\hipoteca-cli\hipoteca.db ← vigilancias y meses vistos
+```
+
+Hoy sólo se borran a mano, y **nadie lo sabe** porque el README no lo dice. Para una herramienta
+que insiste tanto en que los datos no salen de la máquina, no ofrecer un borrado limpio es una
+laguna, no un detalle.
+
+### REF-04 · `revision` exige un dato de amortización — **menor**
+
+`early_repayment_fee_pct` es obligatorio para calcular una revisión, aunque ese cálculo no lo
+use. Se descubrió al escribir el README: el quickstart fallaba con `loan_incomplete`.
+
+Es consecuencia directa de la regla «nada se supone», que es correcta; lo que falla es que el
+modelo no distingue **campos obligatorios para guardar** de **campos necesarios para calcular**.
+
+### REF-05 · `app/compare.go` con 750 líneas — **menor**
+
+El resto de `app` está entre 300 y 480. `compare.go` duplica esa medida y mezcla el recorrido
+de históricos con el formateo de la comparación. No es urgente; es el archivo que más crecerá
+si se añade otro índice comparable.
+
+### REF-06 · Cuatro defectos de la misma familia, sin defensa sistemática — **mayor**
+
+En una sola sesión aparecieron cuatro fallos con la misma raíz: se verificó **el artefacto que
+produce el proyecto**, no **lo que consume el otro lado**.
+
+| Fallo | Verificado | Debía verificarse |
+|---|---|---|
+| Release sin workflow | que el tag existía | `gh release view` |
+| `install.sh` pedía otro nombre | el formato esperado | el asset real de la release |
+| Manifiesto de Scoop en la raíz | que el archivo existía | que Scoop lo encontrara |
+| GIF con el comando cortado | que el GIF existía | sus frames |
+
+Tres de los cuatro ya tienen test o comprobación de CI. El cuarto —que un consumidor externo
+encuentre lo publicado— **no tiene ninguna**: ninguna prueba comprueba que `scoop install` o
+`brew install` funcionen de verdad, sólo que los archivos están en su sitio.
+
+Eso no se arregla con un test unitario. Se arregla con un job de CI que, tras un tag,
+**ejecute el gestor de paquetes sobre un manifiesto local** y compruebe que instala.
+
+## Lo que este pase no encontró
+
+- No hay dependencias circulares.
+- No hay lógica de cálculo fuera de `finance` y `app`.
+- No hay `float64` fuera de la guarda anti-float.
+- El contrato de salida está centralizado en `output` y `errs`, no replicado.
+
+## Veredicto
+
+**La arquitectura se sostiene.** Las capas existen, la dirección de dependencias es correcta
+hacia abajo y el kernel sigue puro tras diecinueve tareas. Lo que hay es **una capa de
+presentación que se salta su propio orquestador** y **una herramienta que no sabe borrarse**.
+
+Ninguno de los seis hallazgos bloquea `v0.1.1`.
+
+## Tareas REF propuestas
+
+| ID | Tarea | Origen |
+|---|---|---|
+| REF-01 | Llevar `cli/config.go`, `cli/index.go`, `cli/loan.go` y `cli/watch.go` a `app` | REF-01 |
+| REF-02 | Sacar la validación de préstamo de `config` | REF-02 |
+| REF-03 | `hipoteca uninstall` (o `hipoteca data purge`) con confirmación y borrado de config, datos y caché | REF-03 |
+| REF-04 | Separar campos obligatorios de guardar de campos necesarios para calcular | REF-04 |
+| REF-05 | Partir `app/compare.go` | REF-05 |
+| REF-06 | Job de CI que instale desde el manifiesto publicado en cada release | REF-06 |
