@@ -630,7 +630,7 @@ Prefijos: H, SPIKE, OPS, CORE, BDE, FIN, LOAN, CMD, WATCH, AGENT, QA, REL, REF.
 | AGENT-01 | `skills`, `schema` y `doctor` completo | Olas 2 a 3 | Un agente sin contexto resuelve las cuatro recetas de 6.5 solo con `skills get` |
 | AGENT-02 | `docs/cli-spec.md` generado; README con atribución y avisos | AGENT-01 | Referencia al día con el binario |
 | REL-01 | GoReleaser, checksums, `install.sh`, tap, Scoop, `update` | AGENT-02 | `v0.1.0` instalable en una línea |
-| QA-01 | Pase de arquitectura final | REL-01 | `odd/reviews/ola-5.md` y tareas REF |
+| QA-01 | Pase de arquitectura final | REL-01 | `odd/reviews/QA-01.md` y tareas REF |
 
 **Sugerencia de corte (revisada):** `v0.1.0` sale de `dev` con **todo** lo entregado, avisos
 incluidos.
