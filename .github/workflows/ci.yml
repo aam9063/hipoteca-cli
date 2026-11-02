@@ -87,11 +87,16 @@ jobs:
       - name: The installed binary answers version
         shell: pwsh
         run: |
-          $out = hipoteca version
-          Write-Host $out
-          $json = $out | ConvertFrom-Json
+          # `version` imprime solo la versión desde la 0.1.1; el contrato JSON
+          # vive detrás de --json. Se comprueban las dos cosas.
+          $out = (hipoteca version).Trim()
+          Write-Host "version: $out"
+          if ($out -notmatch '^\d+\.\d+\.\d+') {
+            throw "el binario instalado no responde version: $out"
+          }
+          $json = hipoteca version --json | ConvertFrom-Json
           if (-not $json.schema_version -or -not $json.version) {
-            throw "el binario instalado no responde version con el contrato: $out"
+            throw "el binario instalado no responde el contrato con --json"
           }
 
   release-check:
