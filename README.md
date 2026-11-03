@@ -1,3 +1,11 @@
+<a href="https://nan.builders/?ref=built-with-nan">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="https://nan.builders/badge/built-with-nan-light.svg">
+    <img width="266" src="https://nan.builders/badge/built-with-nan-dark.svg" alt="Built with NaN">
+  </picture>
+</a>
+
+
 [![ci](https://github.com/aam9063/hipoteca-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/aam9063/hipoteca-cli/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/aam9063/hipoteca-cli)](https://github.com/aam9063/hipoteca-cli/releases)
 [![go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
@@ -248,3 +256,6 @@ MIT. See [`LICENSE`](LICENSE).
 
 Project documentation is in Spanish; code, comments, commit messages and this README are in
 English.
+
+
+[![Built with NaN](https://nan.builders/badge/built-with-nan-compact.svg)](https://nan.builders/?ref=built-with-nan)
